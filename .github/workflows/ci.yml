@@ -1,0 +1,41 @@
+name: CI - qr_code (Docker build)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-backend-and-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # (Tùy chọn) Cài Node để chạy test nếu bạn có test
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install root deps & run tests (optional)
+        run: |
+          if [ -f package.json ]; then
+            npm ci || true
+            npm test --if-present || true
+          fi
+
+           # Build backend image (context = thư mục backend)
+      - name: Docker build backend
+        run: |
+          docker build -t qr_code-backend:ci ./backend
+
+      # Build frontend image (context = thư mục frontend)
+      - name: Docker build frontend
+        run: |
+          docker build -t qr_code-frontend:ci ./frontend
