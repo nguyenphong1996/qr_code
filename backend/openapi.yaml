@@ -1,0 +1,59 @@
+openapi: 3.0.0
+info:
+  title: API Quét Mạng QR
+  version: 1.0.0
+  description: API quét mạng nội bộ, trả về danh sách thiết bị online và mã QR tương ứng.
+servers:
+  - url: http://localhost:3001
+paths:
+  /scan:
+    get:
+      summary: Quét mạng nội bộ và trả về danh sách thiết bị online cùng mã QR
+      description: Quét các IP trong dải mạng, xác định thiết bị online và trả về thông tin thiết bị cùng đường dẫn mã QR.
+      responses:
+        '200':
+          description: Danh sách thiết bị online và mã QR tương ứng
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ip:
+                      type: string
+                      description: Địa chỉ IP của thiết bị
+                      example: 192.168.8.101
+                    url:
+                      type: string
+                      description: Đường dẫn mã QR cuối cùng
+                      example: https://example.com/qr/123
+                    deviceId:
+                      type: string
+                      description: Mã thiết bị được tính từ IP
+                      example: '101'
+              examples:
+                thanh_cong:
+                  summary: Thành công
+                  value:
+                    - ip: "192.168.8.101"
+                      url: "https://example.com/qr/123"
+                      deviceId: "101"
+                    - ip: "192.168.8.102"
+                      url: "https://example.com/qr/124"
+                      deviceId: "102"
+        '500':
+          description: Lỗi khi quét và lấy thông tin thiết bị mạng
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Không thể quét và lấy thông tin thiết bị mạng
+              examples:
+                loi:
+                  summary: Lỗi
+                  value:
+                    error: "Không thể quét và lấy thông tin thiết bị mạng"

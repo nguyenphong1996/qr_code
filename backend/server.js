@@ -1,11 +1,22 @@
 
+
 const express = require('express');
 const ping = require('ping');
 const cors = require('cors');
 const axios = require('axios');
 
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const path = require('path');
+
 const app = express();
 const port = 3001;
+
+// Load OpenAPI spec
+const openApiPath = path.join(__dirname, 'openapi.yaml');
+const openApiSpec = YAML.load(openApiPath);
+// Serve Swagger UI at /api-docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.use(cors());
 
