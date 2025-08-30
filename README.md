@@ -15,19 +15,21 @@
 - Docker & Docker Compose (khuyến nghị)
 - Hoặc: Node.js >= 16, npm >= 8
 
+
 ### Chạy bằng Docker Compose
 ```bash
 docker-compose up --build
 ```
-- Backend chạy ở: http://localhost:3001
-- Frontend chạy ở: http://localhost:3000
+- Truy cập ứng dụng tại: http://localhost:8080
+- Mọi request `/scan` sẽ tự động được frontend (Nginx) chuyển tiếp sang backend, không cần mở port backend ra ngoài.
 
-### Chạy thủ công
+
+### Chạy thủ công (chỉ dùng cho phát triển local)
 #### Backend
 ```bash
 cd backend
 npm install
-node server.js
+npm start
 ```
 Truy cập tài liệu API: http://localhost:3001/api-docs
 
@@ -37,17 +39,21 @@ cd frontend
 npm install
 npm start
 ```
+Truy cập frontend tại: http://localhost:3000
+
 
 ## API
 - `GET /scan`: Quét mạng, trả về danh sách thiết bị online và QR code URL.
-- Xem chi tiết cấu trúc response tại [backend/openapi.yaml](backend/openapi.yaml) hoặc http://localhost:3001/api-docs
+- Xem chi tiết cấu trúc response tại [backend/openapi.yaml](backend/openapi.yaml) hoặc http://localhost:8080/api-docs (khi chạy bằng Docker Compose)
 
 ## Cấu trúc thư mục
 - `backend/`: Node.js Express server, tài liệu API, Dockerfile
 - `frontend/`: React app, Dockerfile, cấu hình nginx
 
+
 ## Tài liệu API (Swagger UI)
-- Đường dẫn: http://localhost:3001/api-docs
+- Khi chạy Docker Compose: http://localhost:8080/api-docs
+- Khi chạy local: http://localhost:3001/api-docs
 - File OpenAPI: [backend/openapi.yaml](backend/openapi.yaml)
 
 ## Tác giả
