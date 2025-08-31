@@ -26,6 +26,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
+      - name: Backend dependency sanity check
+        run: |
+          cd backend
+          npm ci
+          node -e "require('express'); require('swagger-ui-express'); require('yamljs')"
 
       - name: Install root deps & run tests (optional)
         run: |
