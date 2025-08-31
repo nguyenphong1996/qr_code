@@ -14,5 +14,9 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "ping": "^0.4.4"
+  },
+   "dependencies": {
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   }
 }
