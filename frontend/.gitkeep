@@ -1,0 +1,17 @@
+- name: Build frontend image
+  run: docker build -t frontend:test ./frontend
+
+- name: Run frontend container
+  run: docker run -d --rm -p 8080:80 --name fe-test frontend:test
+
+- name: Probe frontend
+  run: |
+    for i in {1..20}; do
+      curl -sf http://localhost:8080 && curl -sf http://localhost:8080/api-docs && exit 0
+      sleep 2
+    done
+    echo "Frontend not responding" && docker logs fe-test && exit 1
+
+- name: Stop
+  if: always()
+  run: docker rm -f fe-test || true
