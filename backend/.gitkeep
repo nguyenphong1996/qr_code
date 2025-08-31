@@ -1,0 +1,17 @@
+- name: Build backend image
+  run: docker build -t backend:test ./backend
+
+- name: Run backend container
+  run: docker run -d --rm -p 3001:3001 --name backend-test backend:test
+
+- name: Wait for backend
+  run: |
+    for i in {1..20}; do
+      curl -sf http://localhost:3001/api-docs && exit 0
+      sleep 2
+    done
+    echo "Backend did not become healthy" && docker logs backend-test && exit 1
+
+- name: Stop
+  if: always()
+  run: docker rm -f backend-test || true
