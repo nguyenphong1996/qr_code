@@ -60,4 +60,8 @@ docker run -p 3001:3001 qr-scanner-backend
 
 ## Ghi chú
 - Đảm bảo rằng bạn đã cấu hình đúng dải mạng trong biến môi trường `NETWORK_RANGE` để quét các thiết bị trong mạng nội bộ.
+<<<<<<< HEAD
 - Kiểm tra tài liệu API để biết thêm chi tiết về các endpoint.
+=======
+- Kiểm tra tài liệu API để biết thêm chi tiết về các endpoint.
+>>>>>>> 1246ca5 (Fix: Add missing dependencies for backend CI)
