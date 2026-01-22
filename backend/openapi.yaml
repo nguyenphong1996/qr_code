@@ -1,49 +1,81 @@
 openapi: 3.0.0
 info:
-  title: API Quét Mạng QR
-  version: 1.0.0
-  description: API quét mạng nội bộ, trả về danh sách thiết bị online và mã QR tương ứng.
+  title: API Quản Lý Phòng & Quét QR
+  version: 2.0.0
+  description: |
+    API quản lý danh sách phòng (devices) và quét mạng để lấy thông tin thiết bị online cùng mã QR tương ứng.
+    
+    **Tính năng chính:**
+    - CRUD danh sách phòng với validation trùng tên
+    - Quét mạng cache-first (local) hoặc network-only
+    - Tự động cập nhật thông tin thiết bị (IP, port, device type) khi quét network
 servers:
   - url: http://localhost:3001
+    description: Development server
+
 paths:
-  /scan:
+  /api/devices:
     get:
-      summary: Quét mạng nội bộ và trả về danh sách thiết bị online cùng mã QR
-      description: Quét các IP trong dải mạng, xác định thiết bị online và trả về thông tin thiết bị cùng đường dẫn mã QR.
+      summary: Lấy danh sách tất cả phòng
+      tags:
+        - Devices
       responses:
         '200':
-          description: Danh sách thiết bị online và mã QR tương ứng
+          description: Danh sách phòng
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    ip:
-                      type: string
-                      description: Địa chỉ IP của thiết bị
-                      example: 192.168.8.101
-                    url:
-                      type: string
-                      description: Đường dẫn mã QR cuối cùng
-                      example: https://example.com/qr/123
-                    deviceId:
-                      type: string
-                      description: Mã thiết bị được tính từ IP
-                      example: '101'
-              examples:
-                thanh_cong:
-                  summary: Thành công
-                  value:
-                    - ip: "192.168.8.101"
-                      url: "https://example.com/qr/123"
-                      deviceId: "101"
-                    - ip: "192.168.8.102"
-                      url: "https://example.com/qr/124"
-                      deviceId: "102"
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
         '500':
-          description: Lỗi khi quét và lấy thông tin thiết bị mạng
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      summary: Tạo phòng mới
+      tags:
+        - Devices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Tên phòng (phải unique)
+                  example: "101"
+      responses:
+        '200':
+          description: Tạo phòng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: "101"
+        '409':
+          description: Tên phòng đã tồn tại
           content:
             application/json:
               schema:
@@ -51,9 +83,241 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: Không thể quét và lấy thông tin thiết bị mạng
-              examples:
-                loi:
-                  summary: Lỗi
-                  value:
-                    error: "Không thể quét và lấy thông tin thiết bị mạng"
+                    example: 'Phòng "101" đã tồn tại. Vui lòng chọn tên khác.'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/devices/{id}:
+    put:
+      summary: Cập nhật tên phòng
+      tags:
+        - Devices
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID của phòng cần cập nhật
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Tên phòng mới (phải unique, loại trừ chính nó)
+                  example: "102"
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: "102"
+        '409':
+          description: Tên phòng đã tồn tại
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: 'Phòng "102" đã tồn tại. Vui lòng chọn tên khác.'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      summary: Xóa phòng
+      tags:
+        - Devices
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID của phòng cần xóa
+      responses:
+        '200':
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: deleted
+                  changes:
+                    type: integer
+                    example: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scan/local:
+    get:
+      summary: Quét thiết bị (cache-first)
+      tags:
+        - Scanning
+      description: |
+        Quét danh sách phòng và thử truy cập URL đã cache (IP, port, path từ lần quét network trước).
+        Nếu cached URL offline hoặc chưa có, trả về status offline.
+        **Không** cập nhật thông tin mạng vào database.
+      responses:
+        '200':
+          description: Kết quả quét cache-first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    deviceId:
+                      type: string
+                      example: "101"
+                    url:
+                      type: string
+                      nullable: true
+                      example: "http://192.168.1.10:8888/path"
+                    type:
+                      type: string
+                      enum: [windows11, android, unknown]
+                      example: windows11
+                    status:
+                      type: string
+                      example: offline
+                    reason:
+                      type: string
+                      example: cached_url_unavailable
+        '500':
+          description: Lỗi khi quét local
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to scan devices (local-first)
+
+  /scan/network:
+    get:
+      summary: Quét thiết bị (network-only)
+      tags:
+        - Scanning
+      description: |
+        Quét tất cả phòng qua public resolver (`http://qr.studiobox.vn:9096/qr/ITT/{deviceName}`).
+        Lấy redirect URL, parse IP/port/path/device_type và **cập nhật vào database**.
+        Dữ liệu cũ sẽ bị ghi đè bởi thông tin mới.
+      responses:
+        '200':
+          description: Kết quả quét network-only (chỉ trả về thiết bị online)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                      example: "http://192.168.1.10:8888/app"
+                    deviceId:
+                      type: string
+                      example: "101"
+                    type:
+                      type: string
+                      enum: [windows11, android, unknown]
+                      example: windows11
+        '500':
+          description: Lỗi khi quét network
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to scan devices (network-only)
+
+components:
+  schemas:
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "101"
+        ip:
+          type: string
+          nullable: true
+          example: "192.168.1.10"
+        port:
+          type: integer
+          nullable: true
+          example: 8888
+        path:
+          type: string
+          nullable: true
+          example: "/app"
+        last_url:
+          type: string
+          nullable: true
+          example: "http://192.168.1.10:8888/app"
+        device_type:
+          type: string
+          nullable: true
+          enum: [windows11, android, unknown]
+          example: windows11
+  
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Invalid request
+    
+    InternalServerError:
+      description: Lỗi hệ thống
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Internal server error

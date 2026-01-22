@@ -20,59 +20,194 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.use(cors());
 
-const lastOctets = [
-    101, 102, 111, 112, 113, 114, 115, 116, 117, 121, 122, 123, 124, 125, 126, 127,
-    131, 132, 133, 134, 135, 136, 137, 141, 142, 143, 144, 145, 146, 147, 151, 152,
-    153, 154, 155, 156, 157, 161, 162, 163, 171, 172, 173, 174, 175, 176, 177
-];
+const db = require('./database.js');
+app.use(express.json());
 
-const hosts = lastOctets.map(octet => `192.168.8.${octet}`);
+const inferDeviceType = (port) => {
+    const p = Number(port);
+    if (p === 8888) return 'windows11';
+    if (p === 8081) return 'android';
+    return 'unknown';
+};
 
-function calculateDeviceId(octet) {
-    const prefix = Math.floor(octet / 10) % 10;
-    const suffix = octet % 10;
-    const id_num = prefix * 100 + suffix;
-    return id_num.toString().padStart(3, '0');
-}
+const normalizePath = (pathname, search, hash) => {
+    const pathPart = pathname || '';
+    const searchPart = search || '';
+    const hashPart = hash || '';
+    return `${pathPart}${searchPart}${hashPart}` || '/';
+};
 
-app.get('/scan', async (req, res) => {
-    console.log('Received request to /scan');
-    
-    try {
-        const pingPromises = hosts.map(host => ping.promise.probe(host, { timeout: 1 }));
-        const pingResults = await Promise.all(pingPromises);
-        const onlineHosts = pingResults.filter(result => result.alive);
-        console.log(`Found ${onlineHosts.length} devices online. Resolving final URLs...`);
+const buildCachedUrl = (device) => {
+    if (device.last_url) return device.last_url;
+    if (device.ip && device.port) {
+        const path = device.path || '';
+        const normalizedPath = path.startsWith('/') || path === '' ? path : `/${path}`;
+        return `http://${device.ip}:${device.port}${normalizedPath}`;
+    }
+    return null;
+};
 
-        const resolvePromises = onlineHosts.map(async (result) => {
-            const lastOctet = parseInt(result.host.split('.')[3], 10);
-            const deviceId = calculateDeviceId(lastOctet);
-            const publicUrl = `http://qr.studiobox.vn:9096/qr/IPXL/${deviceId}`;
+const updateDeviceNetworkInfo = (deviceName, info) => new Promise((resolve, reject) => {
+    const { ip, port, path, finalUrl, deviceType } = info;
+    db.run(
+        `UPDATE devices SET ip = ?, port = ?, path = ?, last_url = ?, device_type = ? WHERE name = ?`,
+        [ip, port, path, finalUrl, deviceType, deviceName],
+        (err) => {
+            if (err) return reject(err);
+            resolve();
+        }
+    );
+});
 
-            try {
-                const response = await axios.get(publicUrl, { maxRedirects: 0, validateStatus: null });
-                if (response.status >= 300 && response.status < 400 && response.headers.location) {
-                    const finalUrl = response.headers.location;
-                    console.log(`Resolved ${result.host} (ID: ${deviceId}) -> ${finalUrl}`);
-                    // Now returning the deviceId along with the ip and url
-                    return { ip: result.host, url: finalUrl, deviceId: deviceId };
-                } else {
-                    console.warn(`Could not get redirect for ${result.host} (ID: ${deviceId}). Status: ${response.status}`);
-                    return null;
-                }
-            } catch (error) {
-                console.error(`Error resolving for ${result.host} (ID: ${deviceId}):`, error.message);
-                return null;
-            }
+const resolveViaNetwork = async (deviceName) => {
+    const publicUrl = `http://qr.studiobox.vn:9096/qr/ITT/${deviceName}`;
+    const response = await axios.get(publicUrl, { maxRedirects: 0, validateStatus: null });
+    if (response.status >= 300 && response.status < 400 && response.headers.location) {
+        const finalUrl = response.headers.location;
+        const parsed = new URL(finalUrl);
+        const port = parsed.port || (parsed.protocol === 'https:' ? 443 : 80);
+        const path = normalizePath(parsed.pathname, parsed.search, parsed.hash);
+        const deviceType = inferDeviceType(port);
+        await updateDeviceNetworkInfo(deviceName, {
+            ip: parsed.hostname,
+            port,
+            path,
+            finalUrl,
+            deviceType,
         });
+        console.log(`Resolved (ID: ${deviceName}) -> ${finalUrl}`);
+        return { url: finalUrl, deviceId: deviceName, type: deviceType };
+    }
+    console.warn(`Could not get redirect for (ID: ${deviceName}). Status: ${response.status}`);
+    return null;
+};
 
-        const resolvedDevices = (await Promise.all(resolvePromises)).filter(Boolean);
-        console.log('Scan complete. Devices with resolved URLs:', resolvedDevices.length);
-        res.json(resolvedDevices);
+const resolveFromCache = async (device) => {
+    const cachedUrl = buildCachedUrl(device);
+    if (!cachedUrl) return null;
+    try {
+        await axios.get(cachedUrl, { timeout: 2000, validateStatus: () => true });
+        const type = device.device_type || inferDeviceType(device.port);
+        console.log(`Using cached URL for (ID: ${device.name}) -> ${cachedUrl}`);
+        return { url: cachedUrl, deviceId: device.name, type };
+    } catch (err) {
+        console.warn(`Cached URL offline for (ID: ${device.name}): ${err.message}`);
+        return null;
+    }
+};
 
+app.get('/api/devices', (req, res) => {
+    db.all("SELECT * FROM devices", [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ "error": err.message });
+            return;
+        }
+        res.json({
+            "message": "success",
+            "data": rows
+        });
+    });
+});
+
+app.post('/api/devices', (req, res) => {
+    const { name } = req.body;
+    // Check for duplicate
+    db.get(`SELECT id FROM devices WHERE name = ?`, [name], (err, row) => {
+        if (err) {
+            res.status(500).json({ "error": err.message });
+            return;
+        }
+        if (row) {
+            res.status(409).json({ "error": `Phòng "${name}" đã tồn tại. Vui lòng chọn tên khác.` });
+            return;
+        }
+        db.run(`INSERT INTO devices (name) VALUES (?)`, [name], function(err) {
+            if (err) {
+                res.status(400).json({ "error": err.message });
+                return;
+            }
+            res.json({
+                "message": "success",
+                "data": { id: this.lastID, name }
+            });
+        });
+    });
+});
+
+app.put('/api/devices/:id', (req, res) => {
+    const { name } = req.body;
+    const { id } = req.params;
+    // Check for duplicate (excluding current device)
+    db.get(`SELECT id FROM devices WHERE name = ? AND id != ?`, [name, id], (err, row) => {
+        if (err) {
+            res.status(500).json({ "error": err.message });
+            return;
+        }
+        if (row) {
+            res.status(409).json({ "error": `Phòng "${name}" đã tồn tại. Vui lòng chọn tên khác.` });
+            return;
+        }
+        db.run(`UPDATE devices SET name = ? WHERE id = ?`, [name, id], function(err) {
+            if (err) {
+                res.status(400).json({ "error": err.message });
+                return;
+            }
+            res.json({ message: "success", data: { id, name } });
+        });
+    });
+});
+
+app.delete('/api/devices/:id', (req, res) => {
+    db.run(`DELETE FROM devices WHERE id = ?`, req.params.id, function(err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({ message: "deleted", changes: this.changes });
+    });
+});
+
+// Cache-first scan: try local cached URLs, fall back to network resolver when missing/offline
+app.get('/scan/local', async (req, res) => {
+    console.log('Received request to /scan/local');
+    try {
+        db.all("SELECT * FROM devices", [], async (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            const results = await Promise.all(rows.map(async (device) => {
+                const cached = await resolveFromCache(device);
+                if (cached) return cached;
+                return { deviceId: device.name, url: null, type: device.device_type || inferDeviceType(device.port), status: 'offline', reason: 'cached_url_unavailable' };
+            }));
+            const resolvedDevices = results.filter((r) => r && r.url);
+            console.log('Local-only scan complete. Cached hits:', resolvedDevices.length, 'total devices:', results.length);
+            res.json(results);
+        });
     } catch (error) {
-        console.error('Error during the process:', error);
-        res.status(500).json({ error: 'Failed to scan and resolve network devices' });
+        console.error('Error during local-first scan:', error);
+        res.status(500).json({ error: 'Failed to scan devices (local-first)' });
+    }
+});
+
+// Network-only scan: always hit resolver and refresh cache
+app.get('/scan/network', async (req, res) => {
+    console.log('Received request to /scan/network');
+    try {
+        db.all("SELECT * FROM devices", [], async (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            const resolvedDevices = (
+                await Promise.all(
+                    rows.map((device) => resolveViaNetwork(device?.name).catch((e) => {
+                        console.error(`Network resolve failed for ${device?.name}:`, e.message);
+                        return null;
+                    }))
+                )
+            ).filter(Boolean);
+            console.log('Network-only scan complete. Devices:', resolvedDevices.length);
+            res.json(resolvedDevices);
+        });
+    } catch (error) {
+        console.error('Error during network-only scan:', error);
+        res.status(500).json({ error: 'Failed to scan devices (network-only)' });
     }
 });
 

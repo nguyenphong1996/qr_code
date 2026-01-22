@@ -1,63 +1,215 @@
-# Backend - QR Scanner App
+# Backend - QR Code Management System
 
-Đây là phần backend của ứng dụng QR Scanner, được xây dựng bằng Node.js và Express.
+Backend của hệ thống quản lý phòng & quét QR, xây dựng bằng Node.js, Express và SQLite.
 
-## Hướng dẫn cài đặt
+## Tính năng
+
+### Device Management API
+- ✅ CRUD operations cho danh sách phòng
+- ✅ Validation unique name (UNIQUE constraint + 409 response)
+- ✅ Auto-update thông tin thiết bị qua network scan
+
+### Scanning Modes
+- **Local scan** (`/scan/local`): Cache-first, không update DB
+- **Network scan** (`/scan/network`): Network resolver + update DB
+
+### Device Type Detection
+- Port `8888` → Windows 11
+- Port `8081` → Android
+- Other → Unknown
+
+---
+
+## Cài đặt & Chạy
 
 ### Yêu cầu
 - Node.js >= 16
 - npm >= 8
 
 ### Cài đặt dependencies
-Chạy lệnh sau để cài đặt các dependencies cần thiết:
 ```bash
 npm install
 ```
 
-## Cách chạy ứng dụng
-
-### Chạy ứng dụng trong môi trường phát triển
-Sử dụng lệnh sau để khởi chạy server:
+### Chạy development
 ```bash
 npm start
 ```
-Server sẽ chạy tại: `http://localhost:3001`
+Server khởi động tại: `http://localhost:3001`
 
-### Chạy ứng dụng trong môi trường sản xuất
-Sử dụng lệnh sau để chạy ứng dụng trong môi trường sản xuất:
+### Chạy production
 ```bash
 NODE_ENV=production npm start
 ```
 
-## API
+---
 
-### Tài liệu API
-- Tài liệu API được cung cấp tại: `http://localhost:3001/api-docs`
-- File OpenAPI: [openapi.yaml](./openapi.yaml)
+## API Documentation
 
-### Các endpoint chính
-- `GET /scan`: Quét mạng nội bộ và trả về danh sách các thiết bị online cùng với mã QR tương ứng.
+### Swagger UI
+- URL: `http://localhost:3001/api-docs`
+- OpenAPI spec: [openapi.yaml](./openapi.yaml)
+
+### Endpoints
+
+#### Device Management
+```
+GET    /api/devices       # Lấy danh sách phòng
+POST   /api/devices       # Tạo phòng mới (validate unique)
+PUT    /api/devices/:id   # Sửa tên phòng (validate unique)
+DELETE /api/devices/:id   # Xóa phòng
+```
+
+**Validation:**
+- POST/PUT trả về `409 Conflict` nếu tên phòng đã tồn tại
+- Error message: `Phòng "xxx" đã tồn tại. Vui lòng chọn tên khác.`
+
+#### Scanning
+```
+GET /scan/local    # Quét cache-first (nhanh, không update DB)
+GET /scan/network  # Quét network + update DB (IP, port, device_type)
+```
+
+**Network scan behavior:**
+- Gọi resolver: `http://qr.studiobox.vn:9096/qr/ITT/{deviceName}`
+- Parse redirect URL → extract `ip`, `port`, `path`, `device_type`
+- **Ghi đè** thông tin cũ trong DB
+
+---
+
+## Database Schema
+
+SQLite database: `./devices.db`
+
+```sql
+CREATE TABLE devices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE,              -- Tên phòng (unique constraint)
+  ip TEXT,                       -- IP thiết bị
+  port INTEGER,                  -- Port (8888/8081/other)
+  path TEXT,                     -- URL path
+  last_url TEXT,                 -- Cached full URL
+  device_type TEXT               -- 'windows11', 'android', 'unknown'
+);
+```
+
+### Migrations
+- Auto-add columns nếu chưa tồn tại (backward compatible)
+- Safe schema evolution
+
+---
 
 ## Biến môi trường
 
-Cấu hình các biến môi trường trong file `.env` (nếu cần):
-- `PORT`: Cổng mà server sẽ lắng nghe (mặc định: 3001)
-- `NETWORK_RANGE`: Dải mạng để quét (ví dụ: `192.168.1.0/24`)
+Tạo file `.env` (optional):
+```bash
+PORT=3001
+```
+
+---
 
 ## Docker
 
-### Build image Docker
-Sử dụng lệnh sau để build image Docker:
+### Build image
 ```bash
-docker build -t qr-scanner-backend .
+docker build -t qr-code-backend .
 ```
 
-### Chạy container Docker
-Sử dụng lệnh sau để chạy container:
+### Chạy container
 ```bash
-docker run -p 3001:3001 qr-scanner-backend
+docker run -p 3001:3001 qr-code-backend
 ```
 
-## Ghi chú
-- Đảm bảo rằng bạn đã cấu hình đúng dải mạng trong biến môi trường `NETWORK_RANGE` để quét các thiết bị trong mạng nội bộ.
-- Kiểm tra tài liệu API để biết thêm chi tiết về các endpoint.
+---
+
+## Cấu trúc code
+
+```
+backend/
+├── server.js          # Express app, routes, scan logic
+├── database.js        # SQLite setup + migrations
+├── openapi.yaml       # OpenAPI 3.0 spec
+├── Dockerfile
+├── package.json
+└── README.md
+```
+
+### Key Functions
+
+**`updateDeviceNetworkInfo(deviceName, info)`**
+- Cập nhật `ip`, `port`, `path`, `last_url`, `device_type` vào DB
+- Gọi từ `resolveViaNetwork()`
+
+**`resolveViaNetwork(deviceName)`**
+- Fetch redirect từ resolver
+- Parse URL components
+- Infer device type từ port
+- Update DB
+
+**`resolveFromCache(device)`**
+- Build cached URL từ `ip`, `port`, `path`
+- Test connectivity (timeout 2s)
+- Return URL hoặc null
+
+---
+
+## Error Handling
+
+### HTTP Status Codes
+- `200` - Success
+- `400` - Bad request
+- `409` - Conflict (duplicate name)
+- `500` - Internal server error
+
+### Duplicate Detection
+- Database: UNIQUE constraint trên `name`
+- API: Manual check trước INSERT/UPDATE
+- Response: `{ "error": "Phòng \"xxx\" đã tồn tại..." }`
+
+---
+
+## Logging
+
+Console logs:
+- `Resolved (ID: xxx) -> URL` - Network scan success
+- `Using cached URL for (ID: xxx)` - Cache hit
+- `Cached URL offline for (ID: xxx)` - Cache miss
+- `Could not get redirect for (ID: xxx)` - Resolver fail
+
+---
+
+## Testing với curl
+
+### Tạo phòng
+```bash
+curl -X POST http://localhost:3001/api/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name":"101"}'
+```
+
+### Tạo duplicate (sẽ fail)
+```bash
+curl -X POST http://localhost:3001/api/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name":"101"}'
+# => 409 Conflict
+```
+
+### Quét network
+```bash
+curl http://localhost:3001/scan/network
+```
+
+### Xem Swagger
+```bash
+open http://localhost:3001/api-docs
+```
+
+---
+
+## Notes
+
+- SQLite database tự động tạo khi chạy lần đầu
+- Network scan **ghi đè** data cũ - không lưu history
+- Local scan **không thay đổi** DB, chỉ đọc cache
+- Device type inference dựa vào port (hardcoded mapping)
