@@ -14,8 +14,8 @@ RUN npm install
 # Copy the rest of the backend source code
 COPY . .
 
-# Make port 8080 available to the world outside this container
-EXPOSE 8080
+# Expose port 3001 (Node.js server port)
+EXPOSE 3001
 
 # Define the command to run the app
 CMD ["node", "server.js"]
