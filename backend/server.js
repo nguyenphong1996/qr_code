@@ -110,32 +110,26 @@ const resolveViaNetwork = async (deviceName) => {
         const port = parsed.port || (parsed.protocol === 'https:' ? 443 : 80);
         const path = normalizePath(parsed.pathname, parsed.search, parsed.hash);
         const deviceType = inferDeviceType(port);
-        await updateDeviceNetworkInfo(deviceName, {
-            ip: parsed.hostname,
-            port,
-            path,
-            finalUrl,
-            deviceType,
-        });
-        console.log(`Resolved (ID: ${deviceName}) -> ${finalUrl}`);
-        return { url: finalUrl, deviceId: deviceName, type: deviceType };
+        
+        // Health check: verify final URL is accessible
+        try {
+            await axios.get(finalUrl, { timeout: 3000, validateStatus: () => true });
+            await updateDeviceNetworkInfo(deviceName, {
+                ip: parsed.hostname,
+                port,
+                path,
+                finalUrl,
+                deviceType,
+            });
+            console.log(`Resolved (ID: ${deviceName}) -> ${finalUrl}`);
+            return { url: finalUrl, deviceId: deviceName, type: deviceType };
+        } catch (healthErr) {
+            console.warn(`Device (ID: ${deviceName}) URL unreachable: ${finalUrl} - ${healthErr.message}`);
+            return null;
+        }
     }
     console.warn(`Could not get redirect for (ID: ${deviceName}). Status: ${response.status}`);
     return null;
-};
-
-const resolveFromCache = async (device) => {
-    const cachedUrl = buildCachedUrl(device);
-    if (!cachedUrl) return null;
-    try {
-        await axios.get(cachedUrl, { timeout: 2000, validateStatus: () => true });
-        const type = device.device_type || inferDeviceType(device.port);
-        console.log(`Using cached URL for (ID: ${device.name}) -> ${cachedUrl}`);
-        return { url: cachedUrl, deviceId: device.name, type };
-    } catch (err) {
-        console.warn(`Cached URL offline for (ID: ${device.name}): ${err.message}`);
-        return null;
-    }
 };
 
 app.get('/api/devices', (req, res) => {
@@ -224,34 +218,7 @@ app.delete('/api/devices/:id', (req, res) => {
     });
 });
 
-// Cache-first scan: try local cached URLs, fall back to network resolver when missing/offline
-app.get('/scan/local', async (req, res) => {
-    console.log('Received request to /scan/local');
-    const { branch } = req.query;
-    
-    if (!branch) {
-        return res.status(400).json({ error: 'Branch parameter is required' });
-    }
-    
-    try {
-        db.all("SELECT * FROM devices WHERE branch = ?", [branch], async (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            const results = await Promise.all(rows.map(async (device) => {
-                const cached = await resolveFromCache(device);
-                if (cached) return cached;
-                return { deviceId: device.name, url: null, type: device.device_type || inferDeviceType(device.port), status: 'offline', reason: 'cached_url_unavailable' };
-            }));
-            const resolvedDevices = results.filter((r) => r && r.url);
-            console.log('Local-only scan complete. Cached hits:', resolvedDevices.length, 'total devices:', results.length);
-            res.json(results);
-        });
-    } catch (error) {
-        console.error('Error during local-first scan:', error);
-        res.status(500).json({ error: 'Failed to scan devices (local-first)' });
-    }
-});
-
-// Network-only scan: always hit resolver and refresh cache
+// Scan devices: always hit network resolver
 app.get('/scan/network', async (req, res) => {
     console.log('Received request to /scan/network');
     const { branch } = req.query;
