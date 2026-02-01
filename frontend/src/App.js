@@ -333,7 +333,7 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                                 },
                             }}
                         >
-                            {isLoading ? 'Đang quét...' : 'Quét Network'}
+                            {isLoading ? 'Đang quét...' : 'ScanQR'}
                         </Button>
                     </Box>
                     
