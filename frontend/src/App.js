@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
@@ -18,9 +18,11 @@ import {
     AppBar,
     Toolbar,
     Paper,
-    Stack
+    Stack,
+    TextField,
+    MenuItem
 } from '@mui/material';
-import { QrCode, Settings, Wifi, Smartphone, Monitor } from 'lucide-react';
+import { QrCode, Settings, Wifi, Smartphone, Monitor, Building2 } from 'lucide-react';
 import DeviceManagerPage from './DeviceManagerPage';
 import './App.css';
 
@@ -121,20 +123,36 @@ const theme = createTheme({
     },
 });
 
-function ScannerPage() {
+function ScannerPage({ branches, selectedBranch, onBranchChange }) {
     const [onlineDevices, setOnlineDevices] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Tìm thông tin chi nhánh được chọn
+    const selectedBranchInfo = branches.find(b => b.prefixed === selectedBranch);
+
     const runScan = async (mode) => {
+        if (!selectedBranch) {
+            setError('Vui lòng chọn chi nhánh trước khi quét.');
+            return;
+        }
+        
         setIsLoading(true);
         setError(null);
         setOnlineDevices([]);
         try {
             const endpoint = mode === 'network' ? '/scan/network' : '/scan/local';
-            const response = await axios.get(`http://localhost:3001${endpoint}`);
+            const response = await axios.get(`http://localhost:3001${endpoint}`, {
+                params: { branch: selectedBranch }
+            });
             const filtered = (response.data || []).filter((d) => d && d.url);
-            setOnlineDevices(filtered);
+            // Sắp xếp theo deviceId tăng dần
+            const sorted = filtered.sort((a, b) => {
+                const idA = parseInt(a.deviceId) || 0;
+                const idB = parseInt(b.deviceId) || 0;
+                return idA - idB;
+            });
+            setOnlineDevices(sorted);
         } catch (err) {
             setError('Không thể thực hiện quét. Dịch vụ backend có đang chạy không?');
             console.error(err);
@@ -176,60 +194,148 @@ function ScannerPage() {
                     </Box>
 
                     <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
-                        Trình quét mã QR mạng
+                        {selectedBranchInfo ? `${selectedBranchInfo.name}` : 'Quét mã QR chi nhánh'}
                     </Typography>
+                    {selectedBranchInfo && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            {selectedBranchInfo.address}
+                        </Typography>
+                    )}
                     <Typography variant="h6" color="text.secondary" gutterBottom sx={{ maxWidth: 600, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
-                        Quét mạng để tìm các thiết bị đã đăng ký và tạo mã QR tự động
+                        {selectedBranchInfo ? 'Quét mạng để tìm các thiết bị' : 'Chọn chi nhánh và quét mạng để tìm các thiết bị đã đăng ký'}
                     </Typography>
+
+                    {/* Branch Selection */}
+                    <Box sx={{ maxWidth: 400, mx: 'auto', mb: 3 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            variant="outlined"
+                            value={selectedBranch}
+                            onChange={(e) => onBranchChange(e.target.value)}
+                            placeholder="Chọn chi nhánh"
+                            InputProps={{
+                                startAdornment: (
+                                    <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                                        <Building2 size={18} color="#22C55E" />
+                                    </Box>
+                                ),
+                            }}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    bgcolor: 'rgba(15, 23, 42, 0.6)',
+                                    borderRadius: 2.5,
+                                    height: 48,
+                                    transition: 'all 0.2s ease',
+                                    '& fieldset': {
+                                        borderColor: 'rgba(34, 197, 94, 0.2)',
+                                        borderWidth: 1.5,
+                                    },
+                                    '&:hover': {
+                                        bgcolor: 'rgba(15, 23, 42, 0.8)',
+                                        transform: 'translateY(-1px)',
+                                        '& fieldset': {
+                                            borderColor: 'rgba(34, 197, 94, 0.4)',
+                                        },
+                                    },
+                                    '&.Mui-focused': {
+                                        bgcolor: 'rgba(15, 23, 42, 0.9)',
+                                        boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.1)',
+                                        '& fieldset': {
+                                            borderColor: '#22C55E',
+                                            borderWidth: 2,
+                                        },
+                                    },
+                                },
+                                '& .MuiSelect-select': {
+                                    py: 1.5,
+                                    pl: 0.5,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontWeight: 600,
+                                    fontSize: '0.95rem',
+                                    color: selectedBranch ? '#F8FAFC' : 'rgba(203, 213, 225, 0.5)',
+                                },
+                                '& .MuiSelect-icon': {
+                                    color: '#22C55E',
+                                },
+                            }}
+                        >
+                            <MenuItem value="" disabled sx={{ 
+                                fontSize: '0.9rem',
+                                fontStyle: 'italic',
+                                color: 'rgba(203, 213, 225, 0.5)',
+                            }}>
+                                Chọn chi nhánh...
+                            </MenuItem>
+                            {branches.map((branch) => (
+                                <MenuItem 
+                                    key={branch.code} 
+                                    value={branch.prefixed}
+                                    sx={{
+                                        fontSize: '0.9rem',
+                                        fontWeight: 500,
+                                        py: 1.5,
+                                        '&:hover': {
+                                            bgcolor: 'rgba(34, 197, 94, 0.1)',
+                                        },
+                                        '&.Mui-selected': {
+                                            bgcolor: 'rgba(34, 197, 94, 0.15)',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(34, 197, 94, 0.2)',
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, width: '100%' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 6,
+                                                    height: 6,
+                                                    borderRadius: '50%',
+                                                    bgcolor: '#22C55E',
+                                                    flexShrink: 0,
+                                                }}
+                                            />
+                                            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                                                {branch.name}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem', ml: 3 }}>
+                                            {branch.address}
+                                        </Typography>
+                                    </Box>
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
                     
-                    {/* CTA Buttons */}
-                    <Stack 
-                        direction={{ xs: 'column', sm: 'row' }} 
-                        spacing={3} 
-                        justifyContent="center" 
-                        sx={{ mt: 4 }}
-                    >
+                    {/* CTA Button */}
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                         <Button
                             variant="contained"
                             color="primary"
                             size="large"
-                            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <QrCode size={20} />}
-                            onClick={() => runScan('local')}
-                            disabled={isLoading}
-                            sx={{
-                                px: 4,
-                                cursor: 'pointer',
-                                '&:disabled': {
-                                    cursor: 'not-allowed',
-                                },
-                            }}
-                        >
-                            {isLoading ? 'Đang quét...' : 'Quét Local'}
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="primary"
-                            size="large"
-                            startIcon={<Wifi size={20} />}
+                            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <Wifi size={20} />}
                             onClick={() => runScan('network')}
                             disabled={isLoading}
                             sx={{
-                                px: 4,
-                                borderWidth: 2,
+                                px: 5,
+                                py: 1.5,
                                 cursor: 'pointer',
-                                bgcolor: 'rgba(34, 197, 94, 0.05)',
-                                '&:hover': {
-                                    bgcolor: 'rgba(34, 197, 94, 0.15)',
-                                    borderWidth: 2,
-                                },
+                                fontSize: '1.05rem',
+                                fontWeight: 600,
+                                minWidth: 200,
                                 '&:disabled': {
                                     cursor: 'not-allowed',
                                 },
                             }}
                         >
-                            Quét Network
+                            {isLoading ? 'Đang quét...' : 'Quét Network'}
                         </Button>
-                    </Stack>
+                    </Box>
                     
                     {error && (
                         <Alert 
@@ -248,64 +354,99 @@ function ScannerPage() {
             </Paper>
 
             {/* Results Grid */}
-            <Grid container spacing={4} justifyContent="center">
+            <Grid container spacing={5} justifyContent="center">
                 {onlineDevices.map((device) => (
                     <Grid item key={device.deviceId} xs={12} sm={6} md={4} lg={3}>
                         <Card 
-                            elevation={3}
+                            elevation={0}
                             sx={{
                                 cursor: 'default',
                                 height: '100%',
+                                bgcolor: 'rgba(30, 41, 59, 0.4)',
+                                border: '1px solid rgba(148, 163, 184, 0.2)',
+                                transition: 'all 0.25s ease',
+                                '&:hover': {
+                                    transform: 'translateY(-4px)',
+                                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.3)',
+                                    borderColor: 'rgba(34, 197, 94, 0.4)',
+                                },
                             }}
                         >
-                            <CardContent sx={{ textAlign: 'center', p: 3 }}>
+                            <CardContent sx={{ textAlign: 'center', p: 2.5 }}>
                                 {/* Device Header */}
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h5" component="div" sx={{ fontWeight: 600, mb: 2 }}>
-                                        Phòng {device.deviceId}
+                                <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mb: 2 }}>
+                                    <Typography variant="h6" component="div" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                                        {device.deviceId}
                                     </Typography>
                                     {device.type && (
                                         <Box
                                             sx={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: 1,
-                                                px: 2,
-                                                py: 0.75,
+                                                px: 1,
+                                                py: 0.25,
                                                 bgcolor: device.type === 'windows11' 
-                                                    ? 'rgba(34, 197, 94, 0.1)' 
-                                                    : 'rgba(59, 130, 246, 0.1)',
-                                                borderRadius: 2,
+                                                    ? 'rgba(34, 197, 94, 0.15)' 
+                                                    : 'rgba(59, 130, 246, 0.15)',
+                                                borderRadius: 1,
                                                 border: `1px solid ${device.type === 'windows11' 
                                                     ? 'rgba(34, 197, 94, 0.3)' 
                                                     : 'rgba(59, 130, 246, 0.3)'}`,
                                             }}
                                         >
                                             {device.type === 'windows11' ? (
-                                                <Monitor size={18} color="#22C55E" />
+                                                <Monitor size={14} color="#22C55E" />
                                             ) : (
-                                                <Smartphone size={18} color="#3B82F6" />
+                                                <Smartphone size={14} color="#3B82F6" />
                                             )}
-                                            <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                {device.type === 'windows11' ? 'Windows' : 'Android'}
-                                            </Typography>
                                         </Box>
                                     )}
-                                </Box>
+                                </Stack>
 
                                 {/* QR Code */}
                                 <Box 
                                     sx={{ 
-                                        my: 3, 
-                                        p: 3, 
+                                        p: 2, 
                                         bgcolor: 'white', 
-                                        borderRadius: 3,
+                                        borderRadius: 2,
                                         display: 'inline-block',
-                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                                     }}
                                 >
-                                    <QRCodeSVG value={device.url} size={180} level="H" />
+                                    <QRCodeSVG value={device.url} size={140} level="H" />
                                 </Box>
+
+                                {/* Resolved Link */}
+                                {device.url && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography 
+                                            component="a"
+                                            href={device.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            variant="caption" 
+                                            sx={{ 
+                                                fontSize: '0.75rem',
+                                                color: '#22C55E',
+                                                wordBreak: 'break-all',
+                                                display: 'block',
+                                                maxWidth: '100%',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'normal',
+                                                textDecoration: 'none',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                '&:hover': {
+                                                    color: '#4ADE80',
+                                                    textDecoration: 'underline',
+                                                },
+                                            }}
+                                        >
+                                            {device.url}
+                                        </Typography>
+                                    </Box>
+                                )}
                             </CardContent>
                         </Card>
                     </Grid>
@@ -333,7 +474,7 @@ function ScannerPage() {
     );
 }
 
-function AppContent() {
+function AppContent({ branches, selectedBranch, onBranchChange }) {
     const location = useLocation();
     return (
         <Box sx={{
@@ -408,19 +549,39 @@ function AppContent() {
                 </AppBar>
             </Box>
             <Routes>
-                <Route path="/" element={<ScannerPage />} />
-                <Route path="/devices" element={<DeviceManagerPage />} />
+                <Route path="/" element={<ScannerPage branches={branches} selectedBranch={selectedBranch} onBranchChange={onBranchChange} />} />
+                <Route path="/devices" element={<DeviceManagerPage selectedBranch={selectedBranch} branches={branches} />} />
             </Routes>
         </Box>
     );
 }
 
 function App() {
+    const [branches, setBranches] = useState([]);
+    const [selectedBranch, setSelectedBranch] = useState('');
+
+    useEffect(() => {
+        fetchBranches();
+    }, []);
+
+    const fetchBranches = async () => {
+        try {
+            const response = await axios.get('http://localhost:3001/api/branches');
+            setBranches(response.data.data || []);
+        } catch (error) {
+            console.error('Error fetching branches:', error);
+        }
+    };
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Router>
-                <AppContent />
+                <AppContent 
+                    branches={branches} 
+                    selectedBranch={selectedBranch} 
+                    onBranchChange={setSelectedBranch}
+                />
             </Router>
         </ThemeProvider>
     );

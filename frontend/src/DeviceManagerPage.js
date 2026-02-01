@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
     Container,
@@ -15,49 +15,71 @@ import {
 import { ArrowLeft, Trash2, Monitor, Smartphone, Plus, Edit2, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-function DeviceManagerPage() {
+function DeviceManagerPage({ selectedBranch, branches = [] }) {
     const [devices, setDevices] = useState([]);
     const [newDeviceName, setNewDeviceName] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
     const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
 
-    useEffect(() => {
-        fetchDevices();
-    }, []);
+    // Tìm thông tin chi nhánh được chọn
+    const selectedBranchInfo = branches.find(b => b.prefixed === selectedBranch);
 
-    const fetchDevices = async () => {
+    const fetchDevices = useCallback(async () => {
+        if (!selectedBranch) return;
         try {
-            const response = await axios.get('http://localhost:3001/api/devices');
+            const response = await axios.get('http://localhost:3001/api/devices', {
+                params: { branch: selectedBranch }
+            });
             setDevices(response.data.data);
             setError(null);
         } catch (error) {
             console.error('Error fetching devices:', error);
             setError('Không thể tải danh sách thiết bị.');
         }
-    };
+    }, [selectedBranch]);
+
+    useEffect(() => {
+        if (selectedBranch) {
+            fetchDevices();
+        }
+    }, [selectedBranch, fetchDevices]);
 
     const addDevice = async () => {
-        if (!newDeviceName.trim()) return;
+        if (!selectedBranch) {
+            setError('Vui lòng chọn chi nhánh trước.');
+            return;
+        }
+        
+        if (!newDeviceName.trim()) {
+            setError('Vui lòng nhập tên phòng.');
+            return;
+        }
         
         // Check for duplicate
         const duplicate = devices.find(d => d.name.toLowerCase() === newDeviceName.trim().toLowerCase());
         if (duplicate) {
-            setError(`Phòng "${newDeviceName}" đã tồn tại. Vui lòng chọn tên khác.`);
+            setError(`Phòng "${newDeviceName}" đã tồn tại trong chi nhánh này. Vui lòng chọn tên khác.`);
             return;
         }
         
         try {
-            await axios.post('http://localhost:3001/api/devices', { name: newDeviceName });
+            await axios.post('http://localhost:3001/api/devices', { 
+                name: newDeviceName,
+                branch: selectedBranch 
+            });
             setNewDeviceName('');
             setError(null);
+            setSuccess(`Thêm phòng "${newDeviceName}" thành công!`);
+            setTimeout(() => setSuccess(null), 3000);
             fetchDevices();
         } catch (error) {
             console.error('Error adding device:', error);
             if (error.response?.status === 409) {
                 setError(error.response.data.error);
             } else {
-                setError('Không thể thêm thiết bị.');
+                setError('Không thể thêm phòng.');
             }
         }
     };
@@ -154,12 +176,44 @@ function DeviceManagerPage() {
                     Trở về trang quét QR
                 </Button>
 
-                <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
-                    Quản lý danh sách phòng
-                </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
-                    Thêm, chỉnh sửa hoặc xóa các phòng trong hệ thống
-                </Typography>
+                {/* Branch Info Header */}
+                {selectedBranchInfo ? (
+                    <Box sx={{ mb: 4, pb: 4, borderBottom: '1px solid rgba(148, 163, 184, 0.1)' }}>
+                        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 1 }}>
+                            {selectedBranchInfo.name}
+                        </Typography>
+                        <Typography variant="body2" color="#22C55E" sx={{ mb: 2, fontWeight: 600 }}>
+                            Mã chi nhánh: {selectedBranchInfo.code}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            📍 {selectedBranchInfo.address}
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+                            Quản lý danh sách phòng
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Thêm, chỉnh sửa hoặc xóa các phòng trong chi nhánh này
+                        </Typography>
+                    </Box>
+                ) : (
+                    <>
+                        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
+                            Quản lý danh sách phòng
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
+                            Thêm, chỉnh sửa hoặc xóa các phòng trong hệ thống
+                        </Typography>
+                    </>
+                )}
+
+                {!selectedBranch && (
+                    <Alert 
+                        severity="info" 
+                        sx={{ mb: 3, borderRadius: 3 }}
+                    >
+                        ⚠️ Vui lòng chọn chi nhánh từ trang quét QR để bắt đầu quản lý thiết bị.
+                    </Alert>
+                )}
 
                 {error && (
                     <Alert 
@@ -171,14 +225,28 @@ function DeviceManagerPage() {
                     </Alert>
                 )}
 
+                {success && (
+                    <Alert 
+                        severity="success" 
+                        sx={{ mb: 3, borderRadius: 3 }}
+                        onClose={() => setSuccess(null)}
+                    >
+                        {success}
+                    </Alert>
+                )}
+
                 {/* Add Device Form */}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="stretch">
                     <TextField
                         fullWidth
+                        disabled={!selectedBranch}
                         label="Tên phòng mới"
                         variant="outlined"
                         value={newDeviceName}
-                        onChange={(e) => setNewDeviceName(e.target.value)}
+                        onChange={(e) => {
+                            setNewDeviceName(e.target.value);
+                            setError(null);
+                        }}
                         onKeyPress={(e) => e.key === 'Enter' && addDevice()}
                         sx={{
                             '& .MuiOutlinedInput-root': {
@@ -198,6 +266,8 @@ function DeviceManagerPage() {
                             },
                             '& .MuiInputLabel-root': {
                                 color: 'rgba(203, 213, 225, 0.7)',
+                                backgroundColor: '#1E293B',
+                                padding: '0 8px',
                                 '&.Mui-focused': {
                                     color: '#22C55E',
                                 },
@@ -206,13 +276,14 @@ function DeviceManagerPage() {
                     />
                     <Button
                         onClick={addDevice}
+                        disabled={!selectedBranch}
                         variant="contained"
                         color="primary"
                         startIcon={<Plus size={20} />}
                         sx={{
                             minWidth: { xs: '100%', sm: 180 },
                             height: 56,
-                            cursor: 'pointer',
+                            cursor: selectedBranch ? 'pointer' : 'not-allowed',
                         }}
                     >
                         Thêm phòng
