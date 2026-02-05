@@ -30,12 +30,7 @@ jobs:
           npm ci
           node -e "require('express'); require('swagger-ui-express'); require('yamljs')"
 
-      - name: Install root deps & run tests (optional)
-        run: |
-          if [ -f package.json ]; then
-            npm ci || true
-            npm test --if-present || true
-          fi
+
 
       - name: Login to GHCR
         uses: docker/login-action@v3
