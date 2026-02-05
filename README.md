@@ -41,6 +41,8 @@
    > - `ghcr.io/nguyenphong1996/qr_code-backend:latest`
    > - `ghcr.io/nguyenphong1996/qr_code-frontend:latest`
 
+   **Lưu ý:** Các Docker image được tự động build và push lên GitHub Container Registry (GHCR) thông qua GitHub Actions mỗi khi có thay đổi trên nhánh `main`.
+
 3. **Truy cập ứng dụng:**
    - 🌐 Giao diện web: http://localhost:8080
    - 📚 API Docs (Swagger): http://localhost:8080/api-docs
@@ -102,7 +104,7 @@ qr_code/
 │   │   ├── App.js         # Main app + QR scanner page
 │   │   ├── DeviceManagerPage.js  # Device CRUD UI
 │   │   └── ...
-│   ├── Dockerfile
+│   ├── Dockerfile         # Multi-stage build (React app + Nginx server)
 │   ├── nginx.conf
 │   └── package.json
 └── docker-compose.yml
