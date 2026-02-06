@@ -1,52 +1,154 @@
-# QR Code Manager - Frontend
+# Frontend - QR Code Manager
 
-Ứng dụng quản lý và quét QR code cho các thiết bị trong mạng.
+React application cho quản lý phòng và quét QR code.
 
-## 🚀 Cấu hình cho thiết bị khác truy cập
+## 📦 Chuẩn bị
 
-### Tự động phát hiện (Khuyến nghị)
+### Yêu cầu
+- **Node.js** v14+
+- **NPM** v6+
 
-Ứng dụng tự động phát hiện API URL:
-- Truy cập qua IP: `http://192.168.1.100:3000` → API: `http://192.168.1.100:3001`
-- Truy cập qua localhost → API: `http://localhost:3001`
+## 🚀 Khởi chạy
 
-**Không cần cấu hình gì thêm!**
+### Development Mode
+
+```bash
+# Cài dependencies
+npm install
+
+# Khởi động server phát triển
+npm start
+
+# Ứng dụng mở tự động tại http://localhost:3000
+```
+
+### Production Build
+
+```bash
+# Build tối ưu cho production
+npm run build
+
+# Output: ./build/
+# Có thể deploy folder này lên web server (Nginx, Apache, v.v.)
+```
+
+## 🔧 Cấu hình API
+
+Ứng dụng **tự động phát hiện API URL** dựa trên hostname hiện tại:
+
+| Cách truy cập | API URL |
+|---|---|
+| `http://localhost:3000` | `http://localhost:3001` |
+| `http://192.168.1.100:3000` | `http://192.168.1.100:3001` |
+| `http://server.local:3000` | `http://server.local:3001` |
 
 ### Cấu hình thủ công (Tùy chọn)
 
 Nếu muốn chỉ định API URL cụ thể:
 
-1. Tạo file `.env`:
 ```bash
+# Tạo file .env
 cp .env.example .env
-```
 
-2. Chỉnh sửa:
-```env
-REACT_APP_API_URL=http://192.168.1.100:3001
-```
+# Chỉnh sửa .env
+nano .env
+# REACT_APP_API_URL=http://192.168.1.100:3001
 
-3. Khởi động lại:
-```bash
+# Khởi động lại
 npm start
 ```
 
 ## 📱 Truy cập từ thiết bị khác
 
-Tìm IP của máy server:
+### Tìm IP server
+
 ```bash
 # Linux/Mac
-ip addr show | grep inet
+ip addr show | grep "inet "
+
 # Windows
 ipconfig
 ```
 
-Truy cập từ điện thoại/tablet:
+### Mở trên điện thoại/tablet
+
+Mở browser nhập:
 ```
 http://192.168.1.100:3000
 ```
 
-## Các lệnh có sẵn
+(Thay IP theo server của bạn)
+
+## 📚 Dependencies chính
+
+- **React 19** - Frontend framework
+- **Material-UI 7** - UI components
+- **React Router 7** - Navigation
+- **Axios** - HTTP client
+- **QRCode.react** - Generate QR codes
+- **Lucide React** - Icons
+
+## 📁 Cấu trúc thư mục
+
+```
+src/
+├── App.js                    # Main component
+├── App.css                   # Styles
+├── DeviceManagerPage.js      # Quản lý phòng
+├── config.js                 # API configuration
+├── constants/
+│   └── branches.js           # Chi nhánh data
+├── index.js                  # Entry point
+├── index.css                 # Global styles
+└── public/
+    ├── index.html
+    └── manifest.json
+```
+
+## 🎨 Tính năng giao diện
+
+- ✅ **Responsive Design** - Mobile, tablet, desktop
+- ✅ **Dark Theme** - Dễ nhìn, professional
+- ✅ **Icons** - Lucide React icons
+- ✅ **Form Validation** - Kiểm tra input
+- ✅ **Error Handling** - Thông báo lỗi chi tiết
+- ✅ **Loading State** - Spinner khi đang quét
+
+## 🔌 API Integration
+
+### Scan mạng
+```javascript
+GET http://localhost:3001/scan/network?branch=IPHI
+```
+
+### Quản lý phòng
+```javascript
+GET    /api/devices?branch=IPHI        // Lấy danh sách
+POST   /api/devices                    // Thêm phòng
+PUT    /api/devices/:id                // Sửa phòng
+DELETE /api/devices/:id                // Xóa phòng
+```
+
+## 🐛 Debugging
+
+### Kiểm tra API URL
+
+Mở DevTools (F12) → Console → Tìm log:
+```
+API Base URL: http://localhost:3001
+```
+
+### Kiểm tra Network requests
+
+DevTools → Network tab → Xem các request đến API
+
+### Kiểm tra Local Storage
+
+DevTools → Application → Local Storage → Xem dữ liệu lưu trữ
+
+## 📄 License
+
+ISC
 
 ### `npm start`
 

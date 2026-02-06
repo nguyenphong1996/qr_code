@@ -1,22 +1,353 @@
-# Backend - QR Code Management System
+# Backend - QR Code Manager
 
-Backend của hệ thống quản lý phòng & quét QR, xây dựng bằng Node.js, Express và SQLite.
+Node.js + Express server quản lý phòng và quét thiết bị mạng.
 
-## Tính năng
+## 📦 Yêu cầu
 
-### Device Management API
-- ✅ CRUD operations cho danh sách phòng
-- ✅ Validation unique name (UNIQUE constraint + 409 response)
-- ✅ Auto-update thông tin thiết bị qua network scan
+- **Node.js** v14+
+- **NPM** v6+
 
-### Scanning Modes
-- **Local scan** (`/scan/local`): Cache-first, không update DB
-- **Network scan** (`/scan/network`): Network resolver + update DB
+## 🚀 Khởi chạy
 
-### Device Type Detection
-- Port `8888` → Windows 11
-- Port `8081` → Android
-- Other → Unknown
+### Development Mode
+
+```bash
+# Cài dependencies
+npm install
+
+# Khởi động server
+npm start
+
+# Server chạy tại http://localhost:3001
+```
+
+Server sẽ:
+- Tạo database SQLite tại `devices.db` (nếu chưa tồn tại)
+- Serve API tại port 3001
+- Serve Swagger UI tại `/api-docs`
+
+### Production Mode
+
+```bash
+# Cài dependencies
+npm install --production
+
+# Khởi động
+npm start
+```
+
+## 📚 API Endpoints
+
+### Chi nhánh
+```
+GET /api/branches
+```
+Danh sách 27 chi nhánh ICOOL (dữ liệu tĩnh).
+
+**Response:**
+```json
+{
+  "message": "success",
+  "data": [
+    {
+      "code": "PHI",
+      "prefixed": "IPHI",
+      "name": "ICOOL Phan Huy Ích",
+      "address": "455 Phan Huy Ích, Phường An Hội Tây, Quận Gò Vấp, TP.HCM"
+    }
+  ]
+}
+```
+
+### Phòng / Thiết bị
+
+#### Lấy danh sách
+```
+GET /api/devices?branch=IPHI
+```
+
+**Query params:**
+- `branch` (optional) - Lọc theo chi nhánh
+
+**Response:**
+```json
+{
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "name": "101",
+      "branch": "IPHI",
+      "ip": "192.168.1.50",
+      "port": 8888,
+      "path": "/",
+      "last_url": "http://192.168.1.50:8888/",
+      "device_type": "windows11"
+    }
+  ]
+}
+```
+
+#### Thêm phòng
+```
+POST /api/devices
+Content-Type: application/json
+
+{
+  "name": "101",
+  "branch": "IPHI"
+}
+```
+
+**Response (201):**
+```json
+{
+  "message": "success",
+  "data": {
+    "id": 1,
+    "name": "101",
+    "branch": "IPHI"
+  }
+}
+```
+
+#### Sửa phòng
+```
+PUT /api/devices/:id
+Content-Type: application/json
+
+{
+  "name": "102"
+}
+```
+
+#### Xóa phòng
+```
+DELETE /api/devices/:id
+```
+
+**Response:**
+```json
+{
+  "message": "deleted",
+  "changes": 1
+}
+```
+
+### Quét mạng
+
+```
+GET /scan/network?branch=IPHI
+```
+
+Quét toàn bộ thiết bị trong chi nhánh và cập nhật DB.
+
+**Response:**
+```json
+[
+  {
+    "deviceId": "101",
+    "url": "http://192.168.1.50:8888/",
+    "type": "windows11"
+  },
+  {
+    "deviceId": "102",
+    "url": "http://192.168.1.51:8081/",
+    "type": "android"
+  }
+]
+```
+
+### API Documentation
+
+```
+GET /api-docs
+```
+
+Swagger UI interactif để test API.
+
+## 🗄️ Database
+
+### Schema
+
+```sql
+CREATE TABLE devices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  ip TEXT,
+  port INTEGER,
+  path TEXT,
+  last_url TEXT,
+  device_type TEXT,
+  UNIQUE(name, branch)
+);
+```
+
+### Indexes
+```sql
+CREATE UNIQUE INDEX idx_name_branch ON devices(name, branch)
+```
+
+### Database file
+```
+backend/devices.db
+```
+
+Nếu muốn reset database, xóa file này rồi khởi động lại server.
+
+## ⚙️ Cấu hình
+
+### Environment Variables
+
+Hiện tại không sử dụng `.env`. Có thể thêm sau để cấu hình:
+- Port
+- Database path
+- Resolver URL
+- CORS origins
+
+### Port
+
+Mặc định: `3001`
+
+Để thay đổi, chỉnh sửa `server.js`:
+```javascript
+const port = 3001;  // Thay số ở đây
+```
+
+### Resolver URL
+
+Hiện tại sử dụng: `http://qr.studiobox.vn:9096`
+
+Để thay đổi, chỉnh sửa `server.js`:
+```javascript
+const publicUrl = `http://qr.studiobox.vn:9096/qr/ITT/${deviceName}`;
+```
+
+## 🏗️ Cấu trúc file
+
+```
+backend/
+├── server.js           # Main server file
+├── database.js         # SQLite setup
+├── openapi.yaml        # API documentation
+├── package.json
+├── devices.db          # SQLite database (auto-created)
+└── README.md
+```
+
+## 📖 Files chính
+
+### server.js
+- Express setup
+- Routes definition
+- Request handling
+- Error handling
+
+### database.js
+- SQLite connection
+- Table creation
+- Schema migration
+
+### openapi.yaml
+- API specification
+- Endpoint definitions
+- Request/response schemas
+- Examples
+
+## 🔌 Headers
+
+Tất cả requests lên server cần:
+```
+Content-Type: application/json
+```
+
+CORS được enable cho tất cả origins.
+
+## ❌ Error Responses
+
+### 400 Bad Request
+```json
+{
+  "error": "Branch là bắt buộc."
+}
+```
+
+### 409 Conflict
+```json
+{
+  "error": "Phòng \"101\" đã tồn tại trong chi nhánh này. Vui lòng chọn tên khác."
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "error": "Internal server error",
+  "message": "Error details..."
+}
+```
+
+## 🧪 Test API
+
+### Với curl
+
+```bash
+# Lấy chi nhánh
+curl http://localhost:3001/api/branches
+
+# Lấy phòng
+curl "http://localhost:3001/api/devices?branch=IPHI"
+
+# Thêm phòng
+curl -X POST http://localhost:3001/api/devices \
+  -H "Content-Type: application/json" \
+  -d '{"name":"101", "branch":"IPHI"}'
+
+# Quét mạng
+curl "http://localhost:3001/scan/network?branch=IPHI"
+```
+
+### Với Postman
+
+1. Import OpenAPI file: `openapi.yaml`
+2. Chọn endpoint muốn test
+3. Nhấp "Send"
+
+## 🐛 Troubleshooting
+
+### Port 3001 đã bị chiếm
+
+```bash
+# Tìm process
+lsof -i :3001  # Linux/Mac
+netstat -ano | findstr :3001  # Windows
+
+# Kill process
+kill -9 <PID>  # Linux/Mac
+taskkill /PID <PID> /F  # Windows
+```
+
+### Database bị lỗi
+
+```bash
+# Xóa database cũ
+rm devices.db
+
+# Khởi động lại server để tạo database mới
+npm start
+```
+
+### Quét không tìm thấy thiết bị
+
+- Kiểm tra danh sách phòng đã thêm chưa
+- Kiểm tra network resolver có hoạt động không
+- Kiểm tra firewall
+- Xem logs trong terminal
+
+## 📄 License
+
+ISC
 
 ---
 
