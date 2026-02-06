@@ -1,10 +1,52 @@
-# Bắt đầu với Create React App
+# QR Code Manager - Frontend
 
-Dự án này được khởi tạo bằng [Create React App](https://github.com/facebook/create-react-app).
+Ứng dụng quản lý và quét QR code cho các thiết bị trong mạng.
+
+## 🚀 Cấu hình cho thiết bị khác truy cập
+
+### Tự động phát hiện (Khuyến nghị)
+
+Ứng dụng tự động phát hiện API URL:
+- Truy cập qua IP: `http://192.168.1.100:3000` → API: `http://192.168.1.100:3001`
+- Truy cập qua localhost → API: `http://localhost:3001`
+
+**Không cần cấu hình gì thêm!**
+
+### Cấu hình thủ công (Tùy chọn)
+
+Nếu muốn chỉ định API URL cụ thể:
+
+1. Tạo file `.env`:
+```bash
+cp .env.example .env
+```
+
+2. Chỉnh sửa:
+```env
+REACT_APP_API_URL=http://192.168.1.100:3001
+```
+
+3. Khởi động lại:
+```bash
+npm start
+```
+
+## 📱 Truy cập từ thiết bị khác
+
+Tìm IP của máy server:
+```bash
+# Linux/Mac
+ip addr show | grep inet
+# Windows
+ipconfig
+```
+
+Truy cập từ điện thoại/tablet:
+```
+http://192.168.1.100:3000
+```
 
 ## Các lệnh có sẵn
-
-Trong thư mục dự án, bạn có thể chạy:
 
 ### `npm start`
 

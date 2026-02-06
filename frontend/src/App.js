@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
+import { API_BASE_URL } from './config';
+import { BRANCHES } from './constants/branches';
 import {
     Container,
     Typography,
@@ -51,12 +53,39 @@ const theme = createTheme({
     },
     typography: {
         fontFamily: '"Fira Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        h1: { fontWeight: 700, fontFamily: '"Fira Sans", sans-serif' },
-        h2: { fontWeight: 700, fontFamily: '"Fira Sans", sans-serif' },
-        h3: { fontWeight: 600, fontFamily: '"Fira Sans", sans-serif' },
-        h4: { fontWeight: 600, fontFamily: '"Fira Sans", sans-serif' },
-        h5: { fontWeight: 600, fontFamily: '"Fira Sans", sans-serif' },
-        h6: { fontWeight: 600, fontFamily: '"Fira Sans", sans-serif' },
+        h1: { 
+            fontWeight: 700, 
+            fontFamily: '"Fira Sans", sans-serif',
+            fontSize: '2.5rem',
+            '@media (max-width:600px)': { fontSize: '1.75rem' }
+        },
+        h2: { 
+            fontWeight: 700, 
+            fontFamily: '"Fira Sans", sans-serif',
+            fontSize: '2rem',
+            '@media (max-width:600px)': { fontSize: '1.5rem' }
+        },
+        h3: { 
+            fontWeight: 600, 
+            fontFamily: '"Fira Sans", sans-serif',
+            fontSize: '1.75rem',
+            '@media (max-width:600px)': { fontSize: '1.25rem' }
+        },
+        h4: { 
+            fontWeight: 600, 
+            fontFamily: '"Fira Sans", sans-serif',
+            '@media (max-width:600px)': { fontSize: '1.1rem' }
+        },
+        h5: { 
+            fontWeight: 600, 
+            fontFamily: '"Fira Sans", sans-serif',
+            '@media (max-width:600px)': { fontSize: '1rem' }
+        },
+        h6: { 
+            fontWeight: 600, 
+            fontFamily: '"Fira Sans", sans-serif',
+            '@media (max-width:600px)': { fontSize: '0.95rem' }
+        },
         code: { fontFamily: '"Fira Code", monospace' },
     },
     shape: {
@@ -73,19 +102,37 @@ const theme = createTheme({
                     padding: '10px 24px',
                     fontWeight: 600,
                     transition: 'all 0.2s ease',
+                    '@media (max-width:600px)': {
+                        minHeight: 40,
+                        padding: '8px 16px',
+                        fontSize: '0.875rem',
+                    },
                     '&:hover': {
                         transform: 'translateY(-2px)',
                         boxShadow: '0 6px 20px 0 rgba(0, 0, 0, 0.35)',
+                        '@media (max-width:600px)': {
+                            transform: 'translateY(-1px)',
+                        },
                     },
                 },
                 sizeSmall: {
                     minHeight: 36,
                     padding: '6px 16px',
+                    '@media (max-width:600px)': {
+                        minHeight: 32,
+                        padding: '4px 12px',
+                        fontSize: '0.8rem',
+                    },
                 },
                 sizeLarge: {
                     minHeight: 52,
                     padding: '14px 32px',
                     fontSize: '1.1rem',
+                    '@media (max-width:600px)': {
+                        minHeight: 44,
+                        padding: '10px 20px',
+                        fontSize: '0.95rem',
+                    },
                 },
             },
         },
@@ -97,9 +144,17 @@ const theme = createTheme({
                     boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
                     border: '1px solid rgba(148, 163, 184, 0.1)',
                     transition: 'all 0.25s ease',
+                    '@media (max-width:600px)': {
+                        borderRadius: 12,
+                        boxShadow: '0 6px 24px rgba(0, 0, 0, 0.25)',
+                    },
                     '&:hover': {
                         transform: 'translateY(-4px)',
                         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+                        '@media (max-width:600px)': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
+                        },
                     },
                 },
             },
@@ -142,10 +197,18 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
         setOnlineDevices([]);
         try {
             const endpoint = mode === 'network' ? '/scan/network' : '/scan/local';
-            const response = await axios.get(`http://localhost:3001${endpoint}`, {
-                params: { branch: selectedBranch }
+            const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
+                params: { branch: selectedBranch },
+                validateStatus: (status) => status >= 200 && status < 500
             });
-            const filtered = (response.data || []).filter((d) => d && d.url);
+            
+            // Check if response is valid
+            if (!response || !response.data) {
+                throw new Error('Invalid response from server');
+            }
+            
+            const data = Array.isArray(response.data) ? response.data : [];
+            const filtered = data.filter((d) => d && d.url);
             // Sắp xếp theo deviceId tăng dần
             const sorted = filtered.sort((a, b) => {
                 const idA = parseInt(a.deviceId) || 0;
@@ -155,22 +218,30 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
             setOnlineDevices(sorted);
         } catch (err) {
             setError('Không thể thực hiện quét. Dịch vụ backend có đang chạy không?');
-            console.error(err);
+            console.error('Scan error:', err);
         }
         setIsLoading(false);
     };
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
+        <Container maxWidth="lg" sx={{ 
+            mt: 6, 
+            mb: 6,
+            px: { xs: 2, sm: 3 },
+            '@media (max-width:600px)': {
+                mt: 3,
+                mb: 3,
+            }
+        }}>
             {/* Hero Section */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 6,
-                    mb: 6,
+                    p: { xs: 3, sm: 4, md: 6 },
+                    mb: { xs: 3, sm: 4, md: 6 },
                     bgcolor: 'rgba(30, 41, 59, 0.6)',
                     backdropFilter: 'blur(20px)',
-                    borderRadius: 4,
+                    borderRadius: { xs: 3, md: 4 },
                     border: '1px solid rgba(148, 163, 184, 0.1)',
                     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
                 }}
@@ -182,31 +253,45 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: 80,
-                            height: 80,
-                            borderRadius: '20px',
+                            width: { xs: 60, sm: 80 },
+                            height: { xs: 60, sm: 80 },
+                            borderRadius: { xs: '16px', sm: '20px' },
                             bgcolor: 'rgba(34, 197, 94, 0.1)',
                             border: '2px solid rgba(34, 197, 94, 0.3)',
-                            mb: 3,
+                            mb: { xs: 2, sm: 3 },
                         }}
                     >
-                        <QrCode size={40} color="#22C55E" strokeWidth={2} />
+                        <QrCode size={40} color="#22C55E" strokeWidth={2} style={{ width: 'clamp(32px, 8vw, 40px)', height: 'clamp(32px, 8vw, 40px)' }} />
                     </Box>
 
-                    <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
+                    <Typography variant="h3" component="h1" gutterBottom sx={{ 
+                        fontWeight: 700, 
+                        mb: 2,
+                        px: { xs: 1, sm: 0 },
+                    }}>
                         {selectedBranchInfo ? `${selectedBranchInfo.name}` : 'Quét mã QR chi nhánh'}
                     </Typography>
                     {selectedBranchInfo && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                            mb: 2,
+                            px: { xs: 2, sm: 0 },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                        }}>
                             {selectedBranchInfo.address}
                         </Typography>
                     )}
-                    <Typography variant="h6" color="text.secondary" gutterBottom sx={{ maxWidth: 600, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
+                    <Typography variant="h6" color="text.secondary" gutterBottom sx={{ 
+                        maxWidth: 600, 
+                        mx: 'auto', 
+                        mb: { xs: 3, sm: 4 }, 
+                        lineHeight: 1.6,
+                        px: { xs: 2, sm: 0 },
+                    }}>
                         {selectedBranchInfo ? 'Quét mạng để tìm các thiết bị' : 'Chọn chi nhánh và quét mạng để tìm các thiết bị đã đăng ký'}
                     </Typography>
 
                     {/* Branch Selection */}
-                    <Box sx={{ maxWidth: 400, mx: 'auto', mb: 3 }}>
+                    <Box sx={{ maxWidth: { xs: '100%', sm: 400 }, mx: 'auto', mb: 3, px: { xs: 1, sm: 0 } }}>
                         <TextField
                             select
                             fullWidth
@@ -313,7 +398,7 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                     </Box>
                     
                     {/* CTA Button */}
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: { xs: 3, sm: 4 }, px: { xs: 1, sm: 0 } }}>
                         <Button
                             variant="contained"
                             color="primary"
@@ -321,13 +406,15 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                             startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <Wifi size={20} />}
                             onClick={() => runScan('network')}
                             disabled={isLoading}
+                            fullWidth={true}
                             sx={{
-                                px: 5,
-                                py: 1.5,
+                                px: { xs: 3, sm: 5 },
+                                py: { xs: 1.2, sm: 1.5 },
                                 cursor: 'pointer',
-                                fontSize: '1.05rem',
+                                fontSize: { xs: '0.95rem', sm: '1.05rem' },
                                 fontWeight: 600,
-                                minWidth: 200,
+                                minWidth: { xs: 'auto', sm: 200 },
+                                maxWidth: { xs: '100%', sm: 300 },
                                 '&:disabled': {
                                     cursor: 'not-allowed',
                                 },
@@ -341,10 +428,11 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                         <Alert 
                             severity="error" 
                             sx={{ 
-                                mt: 4, 
-                                maxWidth: 600, 
-                                mx: 'auto',
-                                borderRadius: 3,
+                                mt: { xs: 3, sm: 4 }, 
+                                maxWidth: { xs: '100%', sm: 600 }, 
+                                mx: { xs: 1, sm: 'auto' },
+                                borderRadius: { xs: 2, sm: 3 },
+                                fontSize: { xs: '0.85rem', sm: '0.875rem' },
                             }}
                         >
                             {error}
@@ -354,7 +442,7 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
             </Paper>
 
             {/* Results Grid */}
-            <Grid container spacing={5} justifyContent="center">
+            <Grid container spacing={{ xs: 2, sm: 3, md: 5 }} justifyContent="center">
                 {onlineDevices.map((device) => (
                     <Grid item key={device.deviceId} xs={12} sm={6} md={4} lg={3}>
                         <Card 
@@ -365,17 +453,24 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                                 bgcolor: 'rgba(30, 41, 59, 0.4)',
                                 border: '1px solid rgba(148, 163, 184, 0.2)',
                                 transition: 'all 0.25s ease',
+                                '@media (max-width:600px)': {
+                                    border: '1px solid rgba(148, 163, 184, 0.15)',
+                                },
                                 '&:hover': {
                                     transform: 'translateY(-4px)',
                                     boxShadow: '0 12px 32px rgba(0, 0, 0, 0.3)',
                                     borderColor: 'rgba(34, 197, 94, 0.4)',
+                                    '@media (max-width:600px)': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)',
+                                    },
                                 },
                             }}
                         >
-                            <CardContent sx={{ textAlign: 'center', p: 2.5 }}>
+                            <CardContent sx={{ textAlign: 'center', p: { xs: 2, sm: 2.5 } }}>
                                 {/* Device Header */}
-                                <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mb: 2 }}>
-                                    <Typography variant="h6" component="div" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                                <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mb: { xs: 1.5, sm: 2 } }}>
+                                    <Typography variant="h6" component="div" sx={{ fontWeight: 700, fontSize: { xs: '1rem', sm: '1.1rem' } }}>
                                         {device.deviceId}
                                     </Typography>
                                     {device.type && (
@@ -406,14 +501,18 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                                 {/* QR Code */}
                                 <Box 
                                     sx={{ 
-                                        p: 2, 
+                                        p: { xs: 1.5, sm: 2 }, 
                                         bgcolor: 'white', 
-                                        borderRadius: 2,
+                                        borderRadius: { xs: 1.5, sm: 2 },
                                         display: 'inline-block',
                                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                                     }}
                                 >
-                                    <QRCodeSVG value={device.url} size={140} level="H" />
+                                    <QRCodeSVG 
+                                        value={device.url} 
+                                        size={window.innerWidth < 600 ? 120 : 140} 
+                                        level="H" 
+                                    />
                                 </Box>
 
                                 {/* Resolved Link */}
@@ -458,14 +557,19 @@ function ScannerPage({ branches, selectedBranch, onBranchChange }) {
                 <Box 
                     textAlign="center" 
                     sx={{ 
-                        mt: 6,
-                        p: 3,
+                        mt: { xs: 4, sm: 5, md: 6 },
+                        p: { xs: 2, sm: 3 },
+                        mx: { xs: 1, sm: 0 },
                         bgcolor: 'rgba(34, 197, 94, 0.1)',
-                        borderRadius: 3,
+                        borderRadius: { xs: 2, sm: 3 },
                         border: '1px solid rgba(34, 197, 94, 0.3)',
                     }}
                 >
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#22C55E' }}>
+                    <Typography variant="h6" sx={{ 
+                        fontWeight: 600, 
+                        color: '#22C55E',
+                        fontSize: { xs: '1rem', sm: '1.25rem' },
+                    }}>
                         ✔ Tìm thấy {onlineDevices.length} thiết bị trực tuyến
                     </Typography>
                 </Box>
@@ -481,6 +585,7 @@ function AppContent({ branches, selectedBranch, onBranchChange }) {
             minHeight: '100vh',
             background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%)',
             position: 'relative',
+            overflow: 'hidden',
             '&::before': {
                 content: '""',
                 position: 'absolute',
@@ -493,37 +598,46 @@ function AppContent({ branches, selectedBranch, onBranchChange }) {
             },
         }}>
             {/* Floating Navbar */}
-            <Box sx={{ maxWidth: 'lg', mx: 'auto', px: 2 }}>
+            <Box sx={{ maxWidth: 'lg', mx: 'auto', px: { xs: 1, sm: 2 } }}>
                 <AppBar
                     position="sticky"
                     elevation={0}
                     sx={{
-                        top: 16,
+                        top: { xs: 8, sm: 16 },
                         bgcolor: 'rgba(30, 41, 59, 0.8)',
                         backdropFilter: 'blur(20px)',
-                        borderRadius: 3,
+                        borderRadius: { xs: 2, sm: 3 },
                         border: '1px solid rgba(148, 163, 184, 0.1)',
                         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
                     }}
                 >
-                    <Toolbar sx={{ minHeight: { xs: 64, sm: 70 }, justifyContent: 'center', position: 'relative' }}>
+                    <Toolbar sx={{ 
+                        minHeight: { xs: 56, sm: 64, md: 70 }, 
+                        justifyContent: 'center', 
+                        position: 'relative',
+                        px: { xs: 1, sm: 2 },
+                    }}>
                         {/* Logo - Centered */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
                             <Box
                                 sx={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    width: 40,
-                                    height: 40,
+                                    width: { xs: 36, sm: 40 },
+                                    height: { xs: 36, sm: 40 },
                                     borderRadius: 2,
                                     bgcolor: 'rgba(34, 197, 94, 0.1)',
                                     border: '1px solid rgba(34, 197, 94, 0.3)',
                                 }}
                             >
-                                <QrCode size={24} color="#22C55E" />
+                                <QrCode size={24} color="#22C55E" style={{ width: 'clamp(20px, 5vw, 24px)', height: 'clamp(20px, 5vw, 24px)' }} />
                             </Box>
-                            <Typography variant="h6" component="div" sx={{ fontWeight: 700, display: { xs: 'none', sm: 'block' } }}>
+                            <Typography variant="h6" component="div" sx={{ 
+                                fontWeight: 700, 
+                                display: { xs: 'none', sm: 'block' },
+                                fontSize: { sm: '1.1rem', md: '1.25rem' },
+                            }}>
                                 QR Manager
                             </Typography>
                         </Box>
@@ -535,14 +649,22 @@ function AppContent({ branches, selectedBranch, onBranchChange }) {
                                 color="primary"
                                 component={Link}
                                 to="/devices"
-                                startIcon={<Settings size={20} />}
+                                startIcon={<Settings size={20} style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />}
                                 sx={{ 
                                     cursor: 'pointer',
                                     position: 'absolute',
-                                    right: 16,
+                                    right: { xs: 8, sm: 16 },
+                                    fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                                    px: { xs: 1.5, sm: 2, md: 3 },
+                                    py: { xs: 0.75, sm: 1 },
+                                    minWidth: 'auto',
+                                    '& .MuiButton-startIcon': {
+                                        marginRight: { xs: 0.5, sm: 1 },
+                                    },
                                 }}
                             >
-                                Quản lý thiết bị
+                                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Quản lý thiết bị</Box>
+                                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Quản lý</Box>
                             </Button>
                         )}
                     </Toolbar>
@@ -557,28 +679,14 @@ function AppContent({ branches, selectedBranch, onBranchChange }) {
 }
 
 function App() {
-    const [branches, setBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState('');
-
-    useEffect(() => {
-        fetchBranches();
-    }, []);
-
-    const fetchBranches = async () => {
-        try {
-            const response = await axios.get('http://localhost:3001/api/branches');
-            setBranches(response.data.data || []);
-        } catch (error) {
-            console.error('Error fetching branches:', error);
-        }
-    };
 
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Router>
                 <AppContent 
-                    branches={branches} 
+                    branches={BRANCHES} 
                     selectedBranch={selectedBranch} 
                     onBranchChange={setSelectedBranch}
                 />

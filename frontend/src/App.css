@@ -5,10 +5,48 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Responsive Typography */
+html {
+    font-size: 16px;
+}
+
+@media (max-width: 600px) {
+    html {
+        font-size: 14px;
+    }
+}
+
+@media (min-width: 1200px) {
+    html {
+        font-size: 18px;
+    }
+}
+
+/* Prevent horizontal scroll on mobile */
+body, html {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+/* Touch target improvements for mobile */
+@media (max-width: 600px) {
+    button, a {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
 /* Custom Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
+}
+
+@media (max-width: 600px) {
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
 }
 
 ::-webkit-scrollbar-track {
@@ -23,6 +61,12 @@ body {
     transition: all 0.2s ease;
 }
 
+@media (max-width: 600px) {
+    ::-webkit-scrollbar-thumb {
+        border-width: 1px;
+    }
+}
+
 ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #4ADE80 0%, #22C55E 100%);
     box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
@@ -32,4 +76,12 @@ body {
 * {
     scrollbar-color: #22C55E rgba(15, 23, 42, 0.3);
     scrollbar-width: thin;
+}
+
+/* Improve text readability on mobile */
+@media (max-width: 600px) {
+    p, span, div {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
 }

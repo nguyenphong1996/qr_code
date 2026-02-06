@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from './config';
 import {
     Container,
     Typography,
@@ -29,14 +30,21 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
     const fetchDevices = useCallback(async () => {
         if (!selectedBranch) return;
         try {
-            const response = await axios.get('http://localhost:3001/api/devices', {
-                params: { branch: selectedBranch }
+            const response = await axios.get(`${API_BASE_URL}/api/devices`, {
+                params: { branch: selectedBranch },
+                validateStatus: (status) => status >= 200 && status < 500
             });
-            setDevices(response.data.data);
-            setError(null);
+            if (response && response.data && response.data.data) {
+                setDevices(response.data.data);
+                setError(null);
+            } else {
+                setDevices([]);
+                setError(null);
+            }
         } catch (error) {
             console.error('Error fetching devices:', error);
             setError('Không thể tải danh sách thiết bị.');
+            setDevices([]);
         }
     }, [selectedBranch]);
 
@@ -65,7 +73,7 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
         }
         
         try {
-            await axios.post('http://localhost:3001/api/devices', { 
+            await axios.post(`${API_BASE_URL}/api/devices`, { 
                 name: newDeviceName,
                 branch: selectedBranch 
             });
@@ -86,7 +94,7 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
 
     const deleteDevice = async (id) => {
         try {
-            await axios.delete(`http://localhost:3001/api/devices/${id}`);
+            await axios.delete(`${API_BASE_URL}/api/devices/${id}`);
             fetchDevices();
         } catch (error) {
             console.error('Error deleting device:', error);
@@ -110,7 +118,7 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
         }
         
         try {
-            await axios.put(`http://localhost:3001/api/devices/${id}`, { name: editingName });
+            await axios.put(`${API_BASE_URL}/api/devices/${id}`, { name: editingName });
             setEditingId(null);
             setEditingName('');
             setError(null);
@@ -144,16 +152,24 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
     const groupedFloors = groupDevicesByFloor(devices);
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
+        <Container maxWidth="lg" sx={{ 
+            mt: 6, 
+            mb: 6,
+            px: { xs: 2, sm: 3 },
+            '@media (max-width:600px)': {
+                mt: 3,
+                mb: 3,
+            }
+        }}>
             {/* Header Section */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 5,
-                    mb: 5,
+                    p: { xs: 3, sm: 4, md: 5 },
+                    mb: { xs: 3, sm: 4, md: 5 },
                     bgcolor: 'rgba(30, 41, 59, 0.6)',
                     backdropFilter: 'blur(20px)',
-                    borderRadius: 4,
+                    borderRadius: { xs: 3, md: 4 },
                     border: '1px solid rgba(148, 163, 184, 0.1)',
                     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
                 }}
@@ -163,44 +179,71 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                     component={Link}
                     to="/"
                     variant="outlined"
-                    startIcon={<ArrowLeft size={20} />}
+                    startIcon={<ArrowLeft size={20} style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />}
                     sx={{
-                        mb: 3,
+                        mb: { xs: 2, sm: 3 },
                         borderWidth: 2,
                         cursor: 'pointer',
+                        fontSize: { xs: '0.85rem', sm: '0.875rem', md: '1rem' },
+                        px: { xs: 2, sm: 3 },
+                        py: { xs: 0.75, sm: 1 },
                         '&:hover': {
                             borderWidth: 2,
                         },
                     }}
                 >
-                    Trở về trang quét QR
+                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Trở về trang quét QR</Box>
+                    <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Trở về</Box>
                 </Button>
 
                 {/* Branch Info Header */}
                 {selectedBranchInfo ? (
-                    <Box sx={{ mb: 4, pb: 4, borderBottom: '1px solid rgba(148, 163, 184, 0.1)' }}>
-                        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 1 }}>
+                    <Box sx={{ mb: { xs: 3, sm: 4 }, pb: { xs: 3, sm: 4 }, borderBottom: '1px solid rgba(148, 163, 184, 0.1)' }}>
+                        <Typography variant="h3" component="h1" gutterBottom sx={{ 
+                            fontWeight: 700, 
+                            mb: 1,
+                            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                        }}>
                             {selectedBranchInfo.name}
                         </Typography>
-                        <Typography variant="body2" color="#22C55E" sx={{ mb: 2, fontWeight: 600 }}>
+                        <Typography variant="body2" color="#22C55E" sx={{ 
+                            mb: 2, 
+                            fontWeight: 600,
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                        }}>
                             Mã chi nhánh: {selectedBranchInfo.code}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                            mb: { xs: 2, sm: 3 },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                        }}>
                             📍 {selectedBranchInfo.address}
                         </Typography>
-                        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="h6" color="text.secondary" sx={{ 
+                            mb: 2,
+                            fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' },
+                        }}>
                             Quản lý danh sách phòng
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                        }}>
                             Thêm, chỉnh sửa hoặc xóa các phòng trong chi nhánh này
                         </Typography>
                     </Box>
                 ) : (
                     <>
-                        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
+                        <Typography variant="h3" component="h1" gutterBottom sx={{ 
+                            fontWeight: 700, 
+                            mb: 2,
+                            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                        }}>
                             Quản lý danh sách phòng
                         </Typography>
-                        <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
+                        <Typography variant="h6" color="text.secondary" sx={{ 
+                            mb: { xs: 3, sm: 4 },
+                            fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' },
+                        }}>
                             Thêm, chỉnh sửa hoặc xóa các phòng trong hệ thống
                         </Typography>
                     </>
@@ -209,7 +252,11 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                 {!selectedBranch && (
                     <Alert 
                         severity="info" 
-                        sx={{ mb: 3, borderRadius: 3 }}
+                        sx={{ 
+                            mb: { xs: 2, sm: 3 }, 
+                            borderRadius: { xs: 2, sm: 3 },
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                        }}
                     >
                         ⚠️ Vui lòng chọn chi nhánh từ trang quét QR để bắt đầu quản lý thiết bị.
                     </Alert>
@@ -218,7 +265,11 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                 {error && (
                     <Alert 
                         severity="error" 
-                        sx={{ mb: 3, borderRadius: 3 }}
+                        sx={{ 
+                            mb: { xs: 2, sm: 3 }, 
+                            borderRadius: { xs: 2, sm: 3 },
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                        }}
                         onClose={() => setError(null)}
                     >
                         {error}
@@ -228,7 +279,11 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                 {success && (
                     <Alert 
                         severity="success" 
-                        sx={{ mb: 3, borderRadius: 3 }}
+                        sx={{ 
+                            mb: { xs: 2, sm: 3 }, 
+                            borderRadius: { xs: 2, sm: 3 },
+                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                        }}
                         onClose={() => setSuccess(null)}
                     >
                         {success}
@@ -251,8 +306,8 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                         sx={{
                             '& .MuiOutlinedInput-root': {
                                 bgcolor: 'rgba(30, 41, 59, 0.8)',
-                                borderRadius: 3,
-                                height: 56,
+                                borderRadius: { xs: 2, sm: 3 },
+                                height: { xs: 48, sm: 56 },
                                 '& fieldset': {
                                     borderColor: 'rgba(148, 163, 184, 0.3)',
                                     borderWidth: 2,
@@ -268,6 +323,7 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                                 color: 'rgba(203, 213, 225, 0.7)',
                                 backgroundColor: '#1E293B',
                                 padding: '0 8px',
+                                fontSize: { xs: '0.875rem', sm: '1rem' },
                                 '&.Mui-focused': {
                                     color: '#22C55E',
                                 },
@@ -279,11 +335,12 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                         disabled={!selectedBranch}
                         variant="contained"
                         color="primary"
-                        startIcon={<Plus size={20} />}
+                        startIcon={<Plus size={20} style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />}
                         sx={{
                             minWidth: { xs: '100%', sm: 180 },
-                            height: 56,
+                            height: { xs: 48, sm: 56 },
                             cursor: selectedBranch ? 'pointer' : 'not-allowed',
+                            fontSize: { xs: '0.875rem', sm: '1rem' },
                         }}
                     >
                         Thêm phòng
@@ -293,21 +350,22 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
 
             {/* Devices List by Floor */}
             {groupedFloors.map(({ label, items }) => (
-                <Box key={label} mb={5}>
+                <Box key={label} mb={{ xs: 3, sm: 4, md: 5 }}>
                     <Typography 
                         variant="h5" 
                         sx={{ 
                             fontWeight: 700, 
-                            mb: 3,
+                            mb: { xs: 2, sm: 3 },
+                            fontSize: { xs: '1.25rem', sm: '1.5rem' },
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 2,
+                            gap: { xs: 1.5, sm: 2 },
                         }}
                     >
                         <Box
                             sx={{
-                                width: 4,
-                                height: 32,
+                                width: { xs: 3, sm: 4 },
+                                height: { xs: 24, sm: 32 },
                                 bgcolor: '#22C55E',
                                 borderRadius: 1,
                             }}
@@ -321,6 +379,8 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                                 color: '#22C55E',
                                 fontWeight: 700,
                                 border: '1px solid rgba(34, 197, 94, 0.3)',
+                                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                height: { xs: 20, sm: 24 },
                             }}
                         />
                     </Typography>
@@ -328,24 +388,28 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                         sx={{
                             display: 'grid',
                             gridTemplateColumns: {
-                                xs: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                sm: 'repeat(auto-fill, minmax(240px, 1fr))',
-                                md: 'repeat(auto-fill, minmax(260px, 1fr))',
+                                xs: 'repeat(auto-fill, minmax(160px, 1fr))',
+                                sm: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                md: 'repeat(auto-fill, minmax(240px, 1fr))',
+                                lg: 'repeat(auto-fill, minmax(260px, 1fr))',
                             },
-                            gap: 3,
+                            gap: { xs: 2, sm: 2.5, md: 3 },
                         }}
                     >
                         {items.map((device) => (
                             <Paper
                                 key={device.id}
                                 sx={{
-                                    p: 2.5,
+                                    p: { xs: 2, sm: 2.5 },
                                     bgcolor: '#1E293B',
-                                    borderRadius: 3,
+                                    borderRadius: { xs: 2, sm: 3 },
                                     border: '1px solid rgba(148, 163, 184, 0.1)',
                                     boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
                                     transition: 'all 0.25s ease',
                                     cursor: editingId === device.id ? 'default' : 'pointer',
+                                    '@media (max-width:600px)': {
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                                    },
                                     '&:hover': {
                                         transform: editingId === device.id ? 'none' : 'translateY(-4px)',
                                         boxShadow: editingId === device.id 
@@ -354,6 +418,12 @@ function DeviceManagerPage({ selectedBranch, branches = [] }) {
                                         borderColor: editingId === device.id 
                                             ? 'rgba(148, 163, 184, 0.1)'
                                             : 'rgba(34, 197, 94, 0.3)',
+                                        '@media (max-width:600px)': {
+                                            transform: editingId === device.id ? 'none' : 'translateY(-2px)',
+                                            boxShadow: editingId === device.id 
+                                                ? '0 2px 8px rgba(0, 0, 0, 0.2)'
+                                                : '0 8px 20px rgba(0, 0, 0, 0.3)',
+                                        },
                                     },
                                 }}
                                 onClick={() => editingId !== device.id && startEditing(device)}
