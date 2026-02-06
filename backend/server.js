@@ -1,3 +1,14 @@
+// Error handlers for uncaught exceptions
+process.on('uncaughtException', (err) => {
+    console.error('FATAL: Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('FATAL: Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -221,12 +232,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server only when database is ready
-const startServer = () => {
-    app.listen(port, () => {
-        console.log(`Backend server listening at http://localhost:${port}`);
-    });
-};
-
-// Wait a bit for database to fully initialize then start
-setTimeout(startServer, 500);
+// Start server immediately (database is initialized in database.js)
+app.listen(port, () => {
+    console.log(`Backend server listening at http://localhost:${port}`);
+});
