@@ -1,7 +1,3 @@
-// API Configuration
-// Tự động phát hiện API URL dựa trên hostname hiện tại
-// Dùng để gọi các endpoint API thực (scan, devices)
-
 const getApiBaseUrl = () => {
     // Nếu có biến môi trường REACT_APP_API_URL, sử dụng nó
     if (process.env.REACT_APP_API_URL) {
@@ -10,9 +6,10 @@ const getApiBaseUrl = () => {
     
     // Lấy hostname từ URL hiện tại
     const hostname = window.location.hostname;
+    const protocol = window.location.protocol; // http: hoặc https:
     
-    // Sử dụng cùng hostname nhưng port 3001 cho API
-    return `http://${hostname}:3001`;
+    // Sử dụng cùng hostname, cùng protocol (http/https), port 3001 cho API
+    return `${protocol}//${hostname}:3001`;
 };
 
 export const API_BASE_URL = getApiBaseUrl();
