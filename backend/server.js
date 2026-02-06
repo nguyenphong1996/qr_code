@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -19,6 +17,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.use(cors());
 
+// Import database - it will auto-initialize
 const db = require('./database.js');
 app.use(express.json());
 
@@ -222,6 +221,12 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(port, () => {
-    console.log(`Backend server listening at http://localhost:${port}`);
-});
+// Start server only when database is ready
+const startServer = () => {
+    app.listen(port, () => {
+        console.log(`Backend server listening at http://localhost:${port}`);
+    });
+};
+
+// Wait a bit for database to fully initialize then start
+setTimeout(startServer, 500);
