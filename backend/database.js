@@ -85,10 +85,8 @@ const initDatabase = async () => {
   }
 };
 
-// Initialize immediately
-initDatabase().catch((err) => {
-  console.error('FATAL: Database init failed, exiting', err);
-  process.exit(1);
-});
-
-module.exports = db;
+// Initialize and export
+module.exports = {
+  db,
+  initDatabase
+};

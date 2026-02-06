@@ -38,7 +38,7 @@ app.use(cors());
 
 // Import database - it will auto-initialize
 console.log('Importing database module...');
-const db = require('./database.js');
+const { db, initDatabase } = require('./database.js');
 console.log('✓ Database module imported');
 app.use(express.json());
 
@@ -242,18 +242,26 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server with error handling
-try {
-    const server = app.listen(port, () => {
-        console.log(`✓ Backend server listening at http://localhost:${port}`);
-    });
+// Start server after database is initialized
+const startServer = async () => {
+    try {
+        console.log('Initializing database...');
+        await initDatabase();
+        console.log('✓ Database initialized');
 
-    // Handle server errors
-    server.on('error', (err) => {
-        console.error('Server error:', err);
+        const server = app.listen(port, () => {
+            console.log(`✓ Backend server listening at http://localhost:${port}`);
+        });
+
+        // Handle server errors
+        server.on('error', (err) => {
+            console.error('Server error:', err);
+            process.exit(1);
+        });
+    } catch (err) {
+        console.error('Failed to start server:', err);
         process.exit(1);
-    });
-} catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-}
+    }
+};
+
+startServer();
