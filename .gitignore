@@ -1,9 +1,5 @@
 # Root level .gitignore
 
-# Database files
-devices.db
-*.db
-
 # Dependencies
 node_modules/
 package-lock.json

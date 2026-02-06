@@ -20,16 +20,26 @@ const path = require('path');
 const app = express();
 const port = 3001;
 
-// Load OpenAPI spec
-const openApiPath = path.join(__dirname, 'openapi.yaml');
-const openApiSpec = YAML.load(openApiPath);
+// Load OpenAPI spec with error handling
+let openApiSpec = {};
+try {
+    const openApiPath = path.join(__dirname, 'openapi.yaml');
+    console.log('Loading OpenAPI spec from:', openApiPath);
+    openApiSpec = YAML.load(openApiPath) || {};
+    console.log('✓ OpenAPI spec loaded');
+} catch (err) {
+    console.error('⚠ Failed to load OpenAPI spec:', err.message);
+}
+
 // Serve Swagger UI at /api-docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.use(cors());
 
 // Import database - it will auto-initialize
+console.log('Importing database module...');
 const db = require('./database.js');
+console.log('✓ Database module imported');
 app.use(express.json());
 
 // Error handling middleware for invalid JSON
@@ -232,7 +242,18 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server immediately (database is initialized in database.js)
-app.listen(port, () => {
-    console.log(`Backend server listening at http://localhost:${port}`);
-});
+// Start server with error handling
+try {
+    const server = app.listen(port, () => {
+        console.log(`✓ Backend server listening at http://localhost:${port}`);
+    });
+
+    // Handle server errors
+    server.on('error', (err) => {
+        console.error('Server error:', err);
+        process.exit(1);
+    });
+} catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+}
