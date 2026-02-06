@@ -3,12 +3,15 @@ const getApiBaseUrl = () => {
     if (process.env.REACT_APP_API_URL) {
         return process.env.REACT_APP_API_URL;
     }
+
+    // Production: dùng cùng origin (Caddy sẽ reverse proxy /api -> backend)
+    if (process.env.NODE_ENV === 'production') {
+        return window.location.origin;
+    }
     
-    // Lấy hostname từ URL hiện tại
+    // Development: dùng port 3001 cho API
     const hostname = window.location.hostname;
     const protocol = window.location.protocol; // http: hoặc https:
-    
-    // Sử dụng cùng hostname, cùng protocol (http/https), port 3001 cho API
     return `${protocol}//${hostname}:3001`;
 };
 
