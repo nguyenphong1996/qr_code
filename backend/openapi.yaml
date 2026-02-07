@@ -184,6 +184,13 @@ paths:
       summary: Quét thiết bị (cache-first)
       tags:
         - Scanning
+      parameters:
+        - in: query
+          name: branch
+          required: true
+          schema:
+            type: string
+          description: Mã chi nhánh để lọc thiết bị
       description: |
         Quét danh sách phòng và thử truy cập URL đã cache (IP, port, path từ lần quét network trước).
         Nếu cached URL offline hoặc chưa có, trả về status offline.

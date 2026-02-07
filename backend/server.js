@@ -16,9 +16,26 @@ const axios = require('axios');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const port = 3001;
+
+const getBranchesData = () => {
+    try {
+        const branchesPath = path.resolve(__dirname, '..', 'frontend', 'src', 'constants', 'branches.data.json');
+        const raw = fs.readFileSync(branchesPath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        console.error('⚠ Failed to load branches data:', err.message);
+        return [];
+    }
+};
+
+const BRANCHES_DATA = getBranchesData();
+
+const ensurePrefixed = (code) => (code && code.startsWith('I') ? code : `I${code}`);
 
 // Load OpenAPI spec with error handling
 let openApiSpec = {};
@@ -75,6 +92,21 @@ const buildCachedUrl = (device) => {
     return null;
 };
 
+const normalizeBranchCode = (branch) => {
+    if (!branch) return '';
+    if (branch.startsWith('I') && branch.length > 1) return branch.slice(1);
+    return branch;
+};
+
+const buildBranchCandidates = (branch) => {
+    const normalized = normalizeBranchCode(branch);
+    const prefixed = normalized ? `I${normalized}` : '';
+    const candidates = [branch, normalized, prefixed]
+        .filter(Boolean)
+        .map((code) => code.trim());
+    return [...new Set(candidates)];
+};
+
 const updateDeviceNetworkInfo = (deviceName, info) => new Promise((resolve, reject) => {
     const { ip, port, path, finalUrl, deviceType } = info;
     db.run(
@@ -87,34 +119,55 @@ const updateDeviceNetworkInfo = (deviceName, info) => new Promise((resolve, reje
     );
 });
 
-const resolveViaNetwork = async (deviceName) => {
-    const publicUrl = `http://qr.studiobox.vn:9096/qr/ITT/${deviceName}`;
-    const response = await axios.get(publicUrl, { maxRedirects: 0, validateStatus: null });
-    if (response.status >= 300 && response.status < 400 && response.headers.location) {
-        const finalUrl = response.headers.location;
-        const parsed = new URL(finalUrl);
-        const port = parsed.port || (parsed.protocol === 'https:' ? 443 : 80);
-        const path = normalizePath(parsed.pathname, parsed.search, parsed.hash);
-        const deviceType = inferDeviceType(port);
-        
-        // Health check: verify final URL is accessible
-        try {
-            await axios.get(finalUrl, { timeout: 3000, validateStatus: () => true });
-            await updateDeviceNetworkInfo(deviceName, {
-                ip: parsed.hostname,
-                port,
-                path,
-                finalUrl,
-                deviceType,
-            });
-            console.log(`Resolved (ID: ${deviceName}) -> ${finalUrl}`);
-            return { url: finalUrl, deviceId: deviceName, type: deviceType };
-        } catch (healthErr) {
-            console.warn(`Device (ID: ${deviceName}) URL unreachable: ${finalUrl} - ${healthErr.message}`);
-            return null;
+const resolveViaNetwork = async (deviceName, branchCode) => {
+    const branchCandidates = buildBranchCandidates(branchCode);
+    let lastStatus = null;
+    let lastUrl = null;
+
+    for (const candidate of branchCandidates) {
+        const publicUrl = `http://qr.studiobox.vn:9096/qr/${candidate}/${deviceName}`;
+        lastUrl = publicUrl;
+        const response = await axios.get(publicUrl, {
+            maxRedirects: 0,
+            validateStatus: null,
+            timeout: 5000,
+        });
+        lastStatus = response.status;
+
+        if (response.status >= 300 && response.status < 400 && response.headers.location) {
+            const finalUrl = response.headers.location;
+            const parsed = new URL(finalUrl);
+            const port = parsed.port || (parsed.protocol === 'https:' ? 443 : 80);
+            const path = normalizePath(parsed.pathname, parsed.search, parsed.hash);
+            const deviceType = inferDeviceType(port);
+
+            // Health check: verify final URL is accessible
+            try {
+                await axios.get(finalUrl, { timeout: 3000, validateStatus: () => true });
+                await updateDeviceNetworkInfo(deviceName, {
+                    ip: parsed.hostname,
+                    port,
+                    path,
+                    finalUrl,
+                    deviceType,
+                });
+                console.log(`Resolved (ID: ${deviceName}) -> ${finalUrl}`);
+                return { url: finalUrl, deviceId: deviceName, type: deviceType };
+            } catch (healthErr) {
+                console.warn(`Device (ID: ${deviceName}) URL unreachable: ${finalUrl} - ${healthErr.message}`);
+                await updateDeviceNetworkInfo(deviceName, {
+                    ip: parsed.hostname,
+                    port,
+                    path,
+                    finalUrl,
+                    deviceType,
+                });
+                return { url: finalUrl, deviceId: deviceName, type: deviceType, status: 'offline' };
+            }
         }
     }
-    console.warn(`Could not get redirect for (ID: ${deviceName}). Status: ${response.status}`);
+
+    console.warn(`Could not get redirect for (ID: ${deviceName}). Status: ${lastStatus} (${lastUrl})`);
     return null;
 };
 
@@ -138,6 +191,16 @@ app.get('/api/devices', (req, res) => {
             "data": rows
         });
     });
+});
+
+app.get('/api/branches', (req, res) => {
+    const branches = BRANCHES_DATA.map((branch) => ({
+        code: branch.code,
+        prefixed: ensurePrefixed(branch.code),
+        name: branch.name,
+        address: branch.address,
+    }));
+    res.json({ message: 'success', data: branches });
 });
 
 app.post('/api/devices', (req, res) => {
@@ -218,7 +281,7 @@ app.get('/scan/network', async (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             const resolvedDevices = (
                 await Promise.all(
-                    rows.map((device) => resolveViaNetwork(device?.name).catch((e) => {
+                    rows.map((device) => resolveViaNetwork(device?.name, branch).catch((e) => {
                         console.error(`Network resolve failed for ${device?.name}:`, e.message);
                         return null;
                     }))
@@ -230,6 +293,42 @@ app.get('/scan/network', async (req, res) => {
     } catch (error) {
         console.error('Error during network-only scan:', error);
         res.status(500).json({ error: 'Failed to scan devices (network-only)' });
+    }
+});
+
+// Scan devices: cache-first local check
+app.get('/scan/local', async (req, res) => {
+    console.log('Received request to /scan/local');
+    const { branch } = req.query;
+
+    if (!branch) {
+        return res.status(400).json({ error: 'Branch parameter is required' });
+    }
+
+    try {
+        db.all("SELECT * FROM devices WHERE branch = ?", [branch], async (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            const resolvedDevices = await Promise.all(
+                rows.map(async (device) => {
+                    if (!device.last_url) {
+                        return { url: null, deviceId: device.name, type: device.device_type || 'unknown', status: 'cached_url_unavailable' };
+                    }
+                    try {
+                        // Quick health check on the cached URL
+                        await axios.get(device.last_url, { timeout: 2000, validateStatus: () => true });
+                        return { url: device.last_url, deviceId: device.name, type: device.device_type };
+                    } catch (healthErr) {
+                        return { url: device.last_url, deviceId: device.name, type: device.device_type, status: 'offline' };
+                    }
+                })
+            );
+            console.log('Local-first scan complete. Devices:', resolvedDevices.length);
+            res.json(resolvedDevices);
+        });
+    } catch (error) {
+        console.error('Error during local-first scan:', error);
+        res.status(500).json({ error: 'Failed to scan devices (local-first)' });
     }
 });
 
